@@ -249,7 +249,7 @@ export default function FolderDetail({ id }: { id: string }) {
             <CustomSelect
               value={inviteRole}
               onChange={(v) => setInviteRole(v as any)}
-              options={ROLES}
+              options={[...ROLES]}
               label="Rol del colaborador"
               className="w-32"
             />
@@ -277,7 +277,7 @@ export default function FolderDetail({ id }: { id: string }) {
                   <CustomSelect
                     value={c.role}
                     onChange={(v) => updateRole.mutate({ folderId: id, userId: c.user.id, role: v as any })}
-                    options={ROLES}
+                    options={[...ROLES]}
                     label="Cambiar rol"
                     className="w-32"
                   />

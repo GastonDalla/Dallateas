@@ -8,6 +8,7 @@ const haptics = new WebHaptics();
 type ToastArgs = Parameters<typeof sonnerToast.success>;
 
 export const htoast = {
+  ...sonnerToast,
   success: (...args: ToastArgs) => {
     haptics.trigger("success");
     return sonnerToast.success(...args);
@@ -23,5 +24,4 @@ export const htoast = {
   info: (...args: Parameters<typeof sonnerToast.info>) => {
     return sonnerToast.info(...args);
   },
-  ...sonnerToast,
 };

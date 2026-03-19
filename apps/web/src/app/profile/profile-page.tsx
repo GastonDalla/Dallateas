@@ -383,7 +383,7 @@ export default function ProfilePage() {
             <button type="button" onClick={() => { navigator.clipboard.writeText(profileUrl); haptic.trigger("success"); toast.success("Link copiado"); }} className="shrink-0 text-primary hover:text-primary/80" aria-label="Copiar link">
               <Copy className="h-3.5 w-3.5" />
             </button>
-            <Link href={profileUrl} className="shrink-0 text-primary hover:text-primary/80" target="_blank" aria-label="Ver perfil">
+            <Link href={profileUrl as any} className="shrink-0 text-primary hover:text-primary/80" target="_blank" aria-label="Ver perfil">
               <ExternalLink className="h-3.5 w-3.5" />
             </Link>
           </div>

@@ -914,7 +914,7 @@ export const appRouter = router({
           select: {
             id: true, name: true, username: true, displayUsername: true, image: true, createdAt: true,
             folders: {
-              where: { visibility: "PUBLIC" },
+              where: { visibility: "PUBLIC" as const },
               select: {
                 id: true, name: true, type: true, color: true, viewCount: true,
                 _count: { select: { vinyls: true } },
@@ -931,7 +931,7 @@ export const appRouter = router({
           orderBy: { date: "asc" as const },
           take: 20,
         },
-      };
+      } as const;
 
       let profile = await prisma.djProfile.findFirst({
         where: { slug: input.slug },

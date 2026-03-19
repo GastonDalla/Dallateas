@@ -186,8 +186,8 @@ export default function DjProfilePage({ username }: { username: string }) {
               <span className="flex items-center gap-1"><MapPin className="h-3 w-3" aria-hidden="true" />{profile.location}</span>
             )}
             <span className="flex items-center gap-1"><Calendar className="h-3 w-3" aria-hidden="true" />Desde {memberSince}</span>
-            {profile.viewCount > 0 && (
-              <span className="flex items-center gap-1"><Eye className="h-3 w-3" aria-hidden="true" />{profile.viewCount.toLocaleString()} visitas</span>
+            {(profile.viewCount ?? 0) > 0 && (
+              <span className="flex items-center gap-1"><Eye className="h-3 w-3" aria-hidden="true" />{profile.viewCount!.toLocaleString()} visitas</span>
             )}
           </div>
         </div>
