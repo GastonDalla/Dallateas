@@ -52,7 +52,27 @@ const nextConfig: NextConfig = {
     "libsql",
     "@prisma/adapter-libsql",
     "@prisma/adapter-pg",
+    "pg",
   ],
+  webpack: (config, { isServer }) => {
+    if (isServer) {
+      config.externals = [
+        ...(Array.isArray(config.externals) ? config.externals : []),
+        ({ request }: { request?: string }, callback: Function) => {
+          if (
+            request &&
+            /^(@libsql|libsql|@prisma\/adapter-libsql|@prisma\/adapter-pg|pg)/.test(
+              request
+            )
+          ) {
+            return callback(null, `commonjs ${request}`);
+          }
+          callback();
+        },
+      ];
+    }
+    return config;
+  },
   images: {
     formats: ["image/avif", "image/webp"],
     remotePatterns: [
