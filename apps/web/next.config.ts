@@ -44,6 +44,12 @@ const withPWA = withPWAInit({
 const nextConfig: NextConfig = {
   typedRoutes: true,
   compress: true,
+  serverExternalPackages: [
+    "@libsql",
+    "libsql",
+    "@prisma/adapter-libsql",
+    "@prisma/adapter-pg",
+  ],
   images: {
     formats: ["image/avif", "image/webp"],
     remotePatterns: [
