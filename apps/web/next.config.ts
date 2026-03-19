@@ -44,8 +44,13 @@ const withPWA = withPWAInit({
 const nextConfig: NextConfig = {
   typedRoutes: true,
   compress: true,
-  serverExternalPackages: [
+  transpilePackages: [
     "@dallateas/db",
+    "@dallateas/api",
+    "@dallateas/auth",
+    "@dallateas/env",
+  ],
+  serverExternalPackages: [
     "@libsql",
     "@libsql/client",
     "@libsql/core",
@@ -61,7 +66,7 @@ const nextConfig: NextConfig = {
         ({ request }: { request?: string }, callback: Function) => {
           if (
             request &&
-            /^(@libsql|libsql|@prisma\/adapter-libsql|@prisma\/adapter-pg|pg)/.test(
+            /^(@libsql|libsql|@prisma\/adapter-(libsql|pg)|pg$)/.test(
               request
             )
           ) {
