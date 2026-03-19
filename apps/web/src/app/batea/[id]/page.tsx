@@ -1,4 +1,4 @@
-import prisma from "@dallateas/db";
+import prisma from "@/lib/prisma";
 import type { Metadata } from "next";
 
 import BateaDetail from "./batea-detail";
