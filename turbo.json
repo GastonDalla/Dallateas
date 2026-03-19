@@ -5,7 +5,20 @@
     "build": {
       "dependsOn": ["^build"],
       "inputs": ["$TURBO_DEFAULT$", ".env*"],
-      "outputs": ["dist/**", ".next/**"]
+      "outputs": ["dist/**", ".next/**"],
+      "env": [
+        "NODE_ENV",
+        "PORT",
+        "BETTER_AUTH_SECRET",
+        "BETTER_AUTH_URL",
+        "CORS_ORIGIN",
+        "DB_PROVIDER",
+        "DATABASE_URL",
+        "DISCOGS_KEY",
+        "DISCOGS_SECRET",
+        "GMAIL_USER",
+        "GMAIL_APP_PASSWORD"
+      ]
     },
     "lint": {
       "dependsOn": ["^lint"]
