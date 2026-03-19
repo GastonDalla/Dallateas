@@ -454,7 +454,7 @@ export default function AdminDashboard() {
                             <span className="text-[11px] text-muted-foreground">Privada</span>
                           )}
                           {folder.hasPassword && (
-                            <Lock className="h-3 w-3 text-muted-foreground" title="Con contrasena" />
+                            <span title="Con contrasena"><Lock className="h-3 w-3 text-muted-foreground" /></span>
                           )}
                         </div>
                       </td>
