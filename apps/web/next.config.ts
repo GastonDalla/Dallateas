@@ -46,10 +46,26 @@ const nextConfig: NextConfig = {
   compress: true,
   serverExternalPackages: [
     "@libsql",
+    "@libsql/client",
+    "@libsql/core",
     "libsql",
     "@prisma/adapter-libsql",
     "@prisma/adapter-pg",
   ],
+  webpack: (config, { isServer }) => {
+    if (isServer) {
+      config.externals = [
+        ...(Array.isArray(config.externals) ? config.externals : []),
+        "@libsql",
+        "@libsql/client",
+        "@libsql/core",
+        "libsql",
+        "@prisma/adapter-libsql",
+        "@prisma/adapter-pg",
+      ];
+    }
+    return config;
+  },
   images: {
     formats: ["image/avif", "image/webp"],
     remotePatterns: [
