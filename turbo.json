@@ -14,10 +14,16 @@
         "CORS_ORIGIN",
         "DB_PROVIDER",
         "DATABASE_URL",
+        "DATABASE_URL_UNPOOLED",
         "DISCOGS_KEY",
         "DISCOGS_SECRET",
         "GMAIL_USER",
         "GMAIL_APP_PASSWORD"
+      ],
+      "passThroughEnv": [
+        "POSTGRES_*",
+        "PG*",
+        "NEON_*"
       ]
     },
     "lint": {
