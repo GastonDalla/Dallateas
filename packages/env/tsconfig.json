@@ -1,0 +1,3 @@
+{
+  "extends": "@dallateas/config/tsconfig.base.json"
+}

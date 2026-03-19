@@ -1,0 +1,27 @@
+{
+  "name": "@dallateas/api",
+  "type": "module",
+  "exports": {
+    ".": {
+      "default": "./src/index.ts"
+    },
+    "./*": {
+      "default": "./src/*.ts"
+    }
+  },
+  "scripts": {},
+  "dependencies": {
+    "@trpc/client": "catalog:",
+    "@trpc/server": "catalog:",
+    "@dallateas/auth": "workspace:*",
+    "@dallateas/db": "workspace:*",
+    "@dallateas/env": "workspace:*",
+    "dotenv": "catalog:",
+    "next": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@dallateas/config": "workspace:*",
+    "typescript": "^5"
+  }
+}

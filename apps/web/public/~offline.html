@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="es-AR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sin conexion | Dallateas</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: Inter, -apple-system, BlinkMacSystemFont, sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      background: #f5f0eb;
+      color: #3d2e1f;
+      padding: 2rem;
+    }
+    .container { text-align: center; max-width: 400px; }
+    .icon { font-size: 4rem; margin-bottom: 1.5rem; opacity: 0.3; }
+    h1 { font-family: 'Playfair Display', Georgia, serif; font-size: 1.5rem; margin-bottom: 0.75rem; }
+    p { font-size: 0.875rem; color: #7a6b5d; line-height: 1.6; margin-bottom: 1.5rem; }
+    button {
+      background: #8b5e34;
+      color: white;
+      border: none;
+      padding: 0.75rem 2rem;
+      border-radius: 0.5rem;
+      font-size: 0.875rem;
+      font-weight: 500;
+      cursor: pointer;
+    }
+    button:hover { background: #7a5230; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="icon">&#127926;</div>
+    <h1>Sin conexion</h1>
+    <p>No hay conexion a internet. Tu coleccion se cargara automaticamente cuando vuelvas a estar online.</p>
+    <button onclick="window.location.reload()">Reintentar</button>
+  </div>
+</body>
+</html>

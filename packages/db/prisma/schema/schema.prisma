@@ -1,0 +1,214 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated"
+  moduleFormat = "esm"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model DjProfile {
+  id          String  @id @default(cuid())
+  userId      String  @unique
+  user        User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  slug        String? @unique
+  bio         String?
+  location    String?
+  isPublic      Boolean @default(false)
+  viewCount     Int     @default(0)
+  showViewCount Boolean @default(true)
+  // Comma-separated genre tags e.g. "Techno, House, Minimal"
+  genres      String?
+  // JSON array of social links: [{ platform, url }]
+  socialLinks String?
+  // JSON array of youtube video URLs
+  youtubeVideos String?
+  // Layout: "slider" or "card"
+  youtubeLayout String @default("card")
+  // JSON array of Spotify track/album URLs
+  spotifyTracks String?
+  // Layout: "slider" or "card"
+  spotifyLayout String @default("card")
+  // Featured vinyl from user's collection
+  featuredVinylId String?
+  featuredVinyl   Vinyl?  @relation(fields: [featuredVinylId], references: [id], onDelete: SetNull)
+  // Featured mix URL (hero embed — YouTube, SoundCloud, Mixcloud)
+  featuredMixUrl   String?
+  featuredMixTitle String?
+  // JSON array of mixes: [{ title, url }]
+  mixes       String?
+  mixesLayout String @default("card")
+  // Booking contact
+  bookingEmail String?
+  bookingPhone String?
+  bookingInfo  String?
+  // Press kit URL (external upload link)
+  pressKitUrl  String?
+  // Optional custom website URL
+  websiteUrl  String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  gigs DjGig[]
+
+  @@index([userId])
+}
+
+model DjGig {
+  id          String   @id @default(cuid())
+  profileId   String
+  profile     DjProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  name        String
+  venue       String?
+  city        String?
+  date        DateTime
+  endDate     DateTime?
+  ticketUrl   String?
+  description String?
+  createdAt   DateTime @default(now())
+
+  @@index([profileId])
+  @@index([date])
+}
+
+model Vinyl {
+  id        String       @id @default(cuid())
+  title     String
+  artist    String
+  label     String?
+  genre     String?
+  style     String?
+  bpm       Int?
+  year      Int?
+  discogsId String?
+  barcode   String?
+  coverUrl  String?
+  notes     String?
+  mixNotes  String?
+  pricePaid Float?
+  folders       FolderVinyl[]
+  tags          VinylTag[]
+  tracks        VinylTrack[]
+  featuredIn    DjProfile[]
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  // Data ownership
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([title])
+  @@index([artist])
+  @@index([genre])
+  @@index([discogsId])
+  @@index([barcode])
+}
+
+model Tag {
+  id     String     @id @default(cuid())
+  name   String
+  userId String
+  user   User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  vinyls VinylTag[]
+
+  @@unique([name, userId])
+  @@index([userId])
+}
+
+model VinylTag {
+  id      String @id @default(cuid())
+  vinylId String
+  tagId   String
+  vinyl   Vinyl  @relation(fields: [vinylId], references: [id], onDelete: Cascade)
+  tag     Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@unique([vinylId, tagId])
+  @@index([vinylId])
+  @@index([tagId])
+}
+
+model VinylTrack {
+  id       String @id @default(cuid())
+  vinylId  String
+  side     String
+  position Int
+  title    String
+  duration String?
+  vinyl    Vinyl  @relation(fields: [vinylId], references: [id], onDelete: Cascade)
+
+  @@index([vinylId])
+}
+
+model Folder {
+  id          String        @id @default(cuid())
+  name        String
+  description String?
+  type        FolderType
+  color       String?
+  visibility  FolderVisibility @default(PRIVATE)
+  password    String?
+  position    Int           @default(0)
+  viewCount   Int           @default(0)
+  vinyls      FolderVinyl[]
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  // Data ownership
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Collaborators
+  collaborators FolderCollaborator[]
+
+  @@index([userId])
+  @@index([visibility])
+}
+
+model FolderCollaborator {
+  id       String           @id @default(cuid())
+  folderId String
+  userId   String
+  role     CollaboratorRole @default(VIEWER)
+  folder   Folder           @relation(fields: [folderId], references: [id], onDelete: Cascade)
+  user     User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime        @default(now())
+
+  @@unique([folderId, userId])
+  @@index([folderId])
+  @@index([userId])
+}
+
+enum CollaboratorRole {
+  VIEWER
+  CONTRIBUTOR
+  EDITOR
+  ADMIN
+}
+
+model FolderVinyl {
+  id       String  @id @default(cuid())
+  folderId String
+  vinylId  String
+  position Int?
+
+  folder Folder @relation(fields: [folderId], references: [id], onDelete: Cascade)
+  vinyl  Vinyl  @relation(fields: [vinylId], references: [id], onDelete: Cascade)
+
+  @@unique([folderId, vinylId])
+  @@index([folderId])
+  @@index([vinylId])
+}
+
+enum FolderType {
+  GENRE
+  SET
+  OTHER
+}
+
+enum FolderVisibility {
+  PUBLIC
+  ACCOUNT
+  PRIVATE
+}

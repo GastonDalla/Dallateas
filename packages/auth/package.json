@@ -1,0 +1,26 @@
+{
+  "name": "@dallateas/auth",
+  "type": "module",
+  "exports": {
+    ".": {
+      "default": "./src/index.ts"
+    },
+    "./*": {
+      "default": "./src/*.ts"
+    }
+  },
+  "scripts": {},
+  "dependencies": {
+    "@dallateas/db": "workspace:*",
+    "@dallateas/env": "workspace:*",
+    "better-auth": "catalog:",
+    "dotenv": "catalog:",
+    "nodemailer": "^8.0.2",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@types/nodemailer": "^7.0.11",
+    "@dallateas/config": "workspace:*",
+    "typescript": "^5"
+  }
+}

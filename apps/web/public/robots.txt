@@ -1,0 +1,17 @@
+User-agent: *
+Allow: /
+Allow: /bateas
+Allow: /batea/
+
+Disallow: /dashboard
+Disallow: /folders
+Disallow: /vinyl/
+Disallow: /admin
+Disallow: /profile
+Disallow: /sessions
+Disallow: /import
+Disallow: /stats
+Disallow: /verify-email
+Disallow: /api/
+
+Sitemap: https://dallateas.com/sitemap.xml
