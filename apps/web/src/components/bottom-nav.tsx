@@ -17,7 +17,7 @@ export function BottomNav() {
   if (!isDashboard && !isFolders) return null;
 
   return (
-    <nav aria-label="Navegacion principal" className="fixed inset-x-0 bottom-0 z-30 border-t border-border/60 bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-md md:static md:border-t-0 md:pb-0">
+    <nav aria-label="Navegacion principal" className="fixed inset-x-0 bottom-0 z-30 border-t border-border/60 bg-background pb-[env(safe-area-inset-bottom)] md:static md:border-t-0 md:pb-0">
       <div className="mx-auto flex max-w-md items-center justify-around px-[max(1rem,env(safe-area-inset-left))] py-1.5 pr-[max(1rem,env(safe-area-inset-right))]">
         <Link
           href="/dashboard"

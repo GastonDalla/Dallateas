@@ -1,6 +1,10 @@
 @import "@dallateas/ui/globals.css";
 
 @layer base {
+  html {
+    background-color: var(--background);
+  }
+
   button,
   a,
   [role="button"],
