@@ -45,7 +45,7 @@ export default function Dashboard() {
   const genres = genresQuery.data ?? [];
   const styles = stylesQuery.data ?? [];
   const tags = tagsQuery.data ?? [];
-  const vinyls = vinylsQuery.data?.items ?? vinylsQuery.data ?? [];
+  const vinyls = vinylsQuery.data?.items ?? [];
   const [folderFilter, setFolderFilter] = useState("");
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
   const [deleteVinylId, setDeleteVinylId] = useState<string | null>(null);
