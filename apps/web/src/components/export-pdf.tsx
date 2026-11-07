@@ -1,64 +1,90 @@
 "use client";
 
-import { FileDown } from "lucide-react";
-import { jsPDF } from "jspdf";
-import autoTable from "jspdf-autotable";
-import { useCallback } from "react";
+import { Button } from "@dallateas/ui/components/button";
+import { useMutation } from "@tanstack/react-query";
+import { FileDown, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 
-interface Vinyl {
+import { pdfTrackRow } from "@/lib/collection-csv";
+
+type PdfVinyl = {
   title: string;
   artist: string;
   label?: string;
   genre?: string;
   year?: number;
   bpm?: number;
-}
+  tracks?: readonly Parameters<typeof pdfTrackRow>[0][];
+};
 
-interface ExportPdfProps {
+type ExportPdfProps = {
   title: string;
-  vinyls: Vinyl[];
+  vinyls: PdfVinyl[];
+};
+
+const MARGIN = 14;
+const TABLE_STYLES = {
+  styles: { fontSize: 9, cellPadding: 3 },
+  headStyles: { fillColor: [30, 30, 30] as [number, number, number], textColor: [255, 255, 255] as [number, number, number], fontStyle: "bold" as const },
+};
+
+async function writePdf({ title, vinyls }: ExportPdfProps) {
+  // Loaded on click: together they weigh more than the rest of the page.
+  const [{ jsPDF }, { default: autoTable }] = await Promise.all([import("jspdf"), import("jspdf-autotable")]);
+
+  const doc: InstanceType<typeof jsPDF> & { lastAutoTable?: { finalY?: number } } = new jsPDF();
+
+  doc.setFontSize(18);
+  doc.text(`Dallateas: ${title}`, MARGIN, 22);
+
+  autoTable(doc, {
+    ...TABLE_STYLES,
+    startY: 32,
+    head: [["Título", "Artista", "Sello", "Género", "Año", "BPM"]],
+    body: vinyls.map(({ title: name, artist, label, genre, year, bpm }) => [
+      name,
+      artist,
+      label ?? "",
+      genre ?? "",
+      year ? String(year) : "",
+      bpm ? String(bpm) : "",
+    ]),
+  });
+
+  for (const vinyl of vinyls) {
+    if (!vinyl.tracks?.length) continue;
+
+    const startY = (doc.lastAutoTable?.finalY ?? 32) + 12;
+    doc.setFontSize(11);
+    doc.text(`${vinyl.artist}: ${vinyl.title}`, MARGIN, startY - 3);
+
+    autoTable(doc, {
+      ...TABLE_STYLES,
+      startY,
+      head: [["Lado", "Corte", "Duración", "BPM", "Tonalidad"]],
+      body: vinyl.tracks.map(pdfTrackRow),
+    });
+  }
+
+  doc.save(`${title.replace(/\s+/g, "-").toLowerCase()}.pdf`);
 }
 
 export function ExportPdf({ title, vinyls }: ExportPdfProps) {
-  const handleExport = useCallback(() => {
-    const doc = new jsPDF();
-
-    doc.setFontSize(18);
-    doc.text(`Dallateas — ${title}`, 14, 22);
-
-    autoTable(doc, {
-      startY: 32,
-      head: [["Titulo", "Artista", "Sello", "Genero", "Ano", "BPM"]],
-      body: vinyls.map((v) => [
-        v.title,
-        v.artist,
-        v.label ?? "",
-        v.genre ?? "",
-        v.year ? String(v.year) : "",
-        v.bpm ? String(v.bpm) : "",
-      ]),
-      styles: {
-        fontSize: 9,
-        cellPadding: 3,
-      },
-      headStyles: {
-        fillColor: [30, 30, 30],
-        textColor: [255, 255, 255],
-        fontStyle: "bold",
-      },
-    });
-
-    doc.save(`${title.replace(/\s+/g, "-").toLowerCase()}.pdf`);
-  }, [title, vinyls]);
+  const exportPdf = useMutation({
+    mutationFn: writePdf,
+    onError: () => toast.error("No se pudo armar el PDF"),
+  });
 
   return (
-    <button
+    <Button
       type="button"
-      onClick={handleExport}
-      className="inline-flex items-center gap-2 rounded-md border border-border/60 bg-card px-3 py-2 text-sm font-medium shadow-sm transition-colors hover:bg-primary hover:text-primary-foreground"
+      variant="outline"
+      className="h-11 gap-1.5 px-3 text-[13px] md:h-8"
+      disabled={exportPdf.isPending}
+      onClick={() => exportPdf.mutate({ title, vinyls })}
     >
-      <FileDown className="h-4 w-4" />
+      {exportPdf.isPending ? <Loader2 aria-hidden="true" className="animate-spin" /> : <FileDown aria-hidden="true" />}
       Exportar PDF
-    </button>
+    </Button>
   );
 }

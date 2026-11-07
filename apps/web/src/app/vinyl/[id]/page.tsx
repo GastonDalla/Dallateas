@@ -1,26 +1,24 @@
-import { auth } from "@dallateas/auth";
-import { headers } from "next/headers";
-import { redirect } from "next/navigation";
+import type { Metadata } from "next";
+
+import { requireSession } from "@/server/session";
+import { HydrateClient, prefetch, serverTrpc } from "@/server/trpc";
 
 import VinylDetail from "./vinyl-detail";
-
-import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "Detalle de vinilo",
   robots: { index: false, follow: false },
 };
 
-export default async function VinylPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  });
-  if (!session?.user) redirect("/login");
-
+export default async function VinylPage({ params }: { params: Promise<{ id: string }> }) {
+  await requireSession();
   const { id } = await params;
-  return <VinylDetail id={id} />;
+
+  await prefetch(serverTrpc.vinylGet.queryOptions({ id }));
+
+  return (
+    <HydrateClient>
+      <VinylDetail id={id} />
+    </HydrateClient>
+  );
 }
