@@ -15,3 +15,5 @@ const prisma = globalForPrisma.prisma ?? createPrismaClient();
 if (env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
 
 export default prisma;
+
+export type { Prisma } from "../prisma/generated/client";

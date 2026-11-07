@@ -2,6 +2,10 @@
   "extends": "@dallateas/config/tsconfig.base.json",
   "compilerOptions": {
     "sourceMap": true,
-    "noEmit": true
+    "noEmit": true,
+    "types": [
+      "node",
+      "bun"
+    ]
   }
 }

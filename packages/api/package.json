@@ -17,10 +17,12 @@
     "@dallateas/auth": "workspace:*",
     "@dallateas/db": "workspace:*",
     "@dallateas/env": "workspace:*",
-    "zod": "catalog:"
+    "zod": "catalog:",
+    "better-auth": "catalog:"
   },
   "devDependencies": {
     "@dallateas/config": "workspace:*",
-    "typescript": "~6.0.3"
+    "typescript": "~6.0.3",
+    "@types/bun": "^1.3.1"
   }
 }
