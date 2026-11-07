@@ -54,14 +54,16 @@ function footnote(text: string) {
   return `<p style="margin:24px 0 0;color:${MUTED};font-size:13px;line-height:1.5;">${text}</p>`;
 }
 
-export async function sendEmail(to: string, subject: string, html: string) {
+/**
+ * Sends through Gmail when it is configured. Without it the email goes nowhere, so in development the
+ * code or link it carries is printed instead, letting a local sign-in finish. Never in production,
+ * where server logs are read by more people than the account owner.
+ */
+export async function sendEmail(to: string, subject: string, html: string, developmentPreview?: string) {
   if (!transporter) {
     console.log(`[EMAIL] To: ${to} | Subject: ${subject}`);
-    if (env.NODE_ENV === "development") {
-      const otpMatch = html.match(/class="otp"[^>]*>(\d+)</);
-      if (otpMatch) console.log(`[EMAIL] OTP: ${otpMatch[1]}`);
-      const urlMatch = html.match(/href="([^"]+)"[^>]*>.*[Ii]ngresar/);
-      if (urlMatch) console.log(`[EMAIL] Magic Link: ${urlMatch[1]}`);
+    if (env.NODE_ENV === "development" && developmentPreview) {
+      console.log(`[EMAIL] ${developmentPreview}`);
     }
     return;
   }

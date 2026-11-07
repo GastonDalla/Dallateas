@@ -131,6 +131,7 @@ export const auth = betterAuth({
           email,
           subjects[type] ?? "Tu código de verificación de Dallateas",
           otpEmailHtml(otp, type),
+          `Code: ${otp}`,
         );
       },
     }),
@@ -140,6 +141,7 @@ export const auth = betterAuth({
           email,
           "Tu link de acceso a Dallateas",
           magicLinkEmailHtml(url),
+          `Magic link: ${url}`,
         );
       },
     }),
