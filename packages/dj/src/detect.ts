@@ -11,7 +11,9 @@ const BPM_STEP = 0.1;
 const FRAME_SECONDS = 0.005;
 const KICK_CUTOFF_HZ = 200;
 const COMB_TEETH = 6;
-const PREFERRED_BPM = 125;
+// A pulse at T also scores fully at T/2, never the reverse, so ties only ever pull a tempo down.
+// Leaning high keeps jungle and drum and bass from reading at half speed. Measured on real loops.
+const PREFERRED_BPM = 150;
 const PRIOR_WIDTH_OCTAVES = 1.4;
 const MIN_ENERGY = 1e-7;
 const MIN_CONFIDENCE = 12;

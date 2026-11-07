@@ -10,7 +10,7 @@ const FIFTHS_PER_SEMITONE = 7;
 const WHEEL_SIZE = 12;
 
 const CAMELOT_PATTERN = /^(1[0-2]|[1-9])([AB])$/;
-const MUSICAL_PATTERN = /^([A-G])([#b♯♭]?)\s*(m|min|minor|maj|major)?$/;
+const MUSICAL_PATTERN = /^([a-g])([#b♯♭]?)\s*(m|min|minor|maj|major)?$/;
 
 /** Every key, for pickers. */
 export const CAMELOT_KEYS = Array.from({ length: WHEEL_SIZE }, (_, index) => index + 1).flatMap(
@@ -33,15 +33,16 @@ export function parseKey(input: string | null | undefined): CamelotKey | null {
   const camelot = value.toUpperCase();
   if (CAMELOT_PATTERN.test(camelot)) return camelot as CamelotKey;
 
-  const match = (value[0]!.toUpperCase() + value.slice(1)).match(MUSICAL_PATTERN);
+  const match = value.toLowerCase().match(MUSICAL_PATTERN);
   if (!match) return null;
 
-  const [, note, accidental, mode] = match;
+  const [, letter, accidental, mode] = match;
+  const note = letter!.toUpperCase();
   const sharpen = accidental === "#" || accidental === "♯" ? 1 : accidental === "b" || accidental === "♭" ? -1 : 0;
   const minor = mode === "m" || mode === "min" || mode === "minor";
 
   // A minor key shares its wheel number with the major key three semitones above it.
-  const majorPitch = NOTE_PITCH[note!]! + sharpen + (minor ? 3 : 0);
+  const majorPitch = NOTE_PITCH[note]! + sharpen + (minor ? 3 : 0);
   const number = wrap(majorPitch * FIFTHS_PER_SEMITONE + 7) + 1;
 
   return `${number}${minor ? "A" : "B"}`;
@@ -75,5 +76,6 @@ export function semitonesAtPitch(pitchPercent: number) {
 export function keyAtPitch(key: CamelotKey, pitchPercent: number): CamelotKey {
   const { number, mode } = split(key);
   const semitones = Math.round(semitonesAtPitch(pitchPercent));
+  if (!Number.isFinite(semitones)) return key;
   return `${wrap(number - 1 + semitones * FIFTHS_PER_SEMITONE) + 1}${mode}`;
 }

@@ -16,6 +16,19 @@ describe("reading keys", () => {
     expect(parseKey("C#")).toBe("3B");
   });
 
+  test("ignores the case of the mode", () => {
+    expect(parseKey("A Minor")).toBe("8A");
+    expect(parseKey("C Major")).toBe("8B");
+    expect(parseKey("AMIN")).toBe("8A");
+    expect(parseKey("a minor")).toBe("8A");
+  });
+
+  test("keeps a flat apart from the note B", () => {
+    expect(parseKey("Bb")).toBe("6B");
+    expect(parseKey("bb")).toBe("6B");
+    expect(parseKey("Bbm")).toBe("3A");
+  });
+
   test("rejects anything else", () => {
     expect(parseKey("13A")).toBeNull();
     expect(parseKey("H")).toBeNull();
@@ -64,6 +77,11 @@ describe("a turntable has no key lock", () => {
 
   test("one semitone down moves five steps on the wheel", () => {
     expect(keyAtPitch("8A", -6)).toBe("1A");
+  });
+
+  test("a pitch with no meaning leaves the key alone", () => {
+    expect(keyAtPitch("8A", Number.POSITIVE_INFINITY)).toBe("8A");
+    expect(keyAtPitch("8A", -100)).toBe("8A");
   });
 
   test("reports the shift in semitones", () => {

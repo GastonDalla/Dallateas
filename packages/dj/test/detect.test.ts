@@ -24,7 +24,7 @@ function kickLoop(bpm: number, seconds: number, noise = 0.02) {
 }
 
 describe("detecting tempo from audio", () => {
-  for (const bpm of [100, 120, 124, 128, 133.3, 140, 174]) {
+  for (const bpm of [86, 95, 100, 120, 124, 128, 133.3, 140, 174, 178, 185]) {
     test(`finds ${bpm} BPM`, () => {
       const result = detectBpm(kickLoop(bpm, 15), SAMPLE_RATE);
 
