@@ -23,11 +23,11 @@ Test runner: `bun test`, integration tests against a scratch Postgres. Engram mi
 | T1 | S5, S7 | Repo hygiene: tracked lockfile, untrack generated client, lint, test and type-check scripts | inline | done | 7d617a6 |
 | T2 | S6, S7 | Update every package, replace next-pwa with a hand-written service worker, `bun audit` clean | inline | done | 7a55029 |
 | T3 | S5, S6 | Split the god router, add `adminProcedure`, fix authorization, data leaks, XSS, password handling, rate limits, headers | inline | done | 2c3b8b2..f9a855b, f0606c1 |
-| T4 | S1 | Server Components and prefetch for public pages, per-request QueryClient, next/image, typed routes, metadata | delegated, 4 parallel screen units (reason: independent units with disjoint surfaces) | in progress | 9afa4ed foundation |
-| T5 | S4 | Per-track BPM and key: schema, API, form, display, lookup with source | inline API, delegated UI | API done | e0112eb, 27a3899, dd77e0f |
-| T6 | S9 | DJ tools: tap tempo, microphone BPM, pitch calculator, mix finder, set flow, condition and storage | inline API, delegated UI | API done | 27a3899 |
-| T7 | S3 | DESIGN.md, tokens and all screens | delegated with T4 | in progress | 9afa4ed foundation |
-| T8 | S8 | Suggestions and docs | inline | pending | |
+| T4 | S1 | Server Components and prefetch for public pages, per-request QueryClient, next/image, typed routes, metadata | delegated, 4 parallel screen units | done | 9afa4ed, 066aea1, then the 23 UI commits ending ca734b8 |
+| T5 | S4 | Per-track BPM and key: schema, API, form, display, lookup with source | inline API, delegated UI | done | e0112eb, 27a3899, ad88b32, 00f90a1, 088708a, 87f4c3c, UI commits |
+| T6 | S9 | DJ tools: tap tempo, microphone BPM, pitch calculator, mix finder, set flow, condition and storage | inline API, delegated UI | done | 27a3899, dd77e0f, cadf0da, UI commits |
+| T7 | S3 | DESIGN.md, tokens and all screens | delegated with T4 | done | 9afa4ed, UI commits |
+| T8 | S8 | Suggestions and docs | inline | done | e6da437, final report |
 
 ## Log
 
@@ -40,3 +40,8 @@ Test runner: `bun test`, integration tests against a scratch Postgres. Engram mi
 - L7: Independent audit recheck: 15 fixed, 6 partly fixed, none open, and it found a regression in my sign-up replacement hook. Replaced with a signed browser proof checked at email verification (f0606c1), tested through the real HTTP handler and OTP.
 - L8: BPM detection measured on 42 real loops with known tempo from the user's sample packs: 38 correct, 2 refused, 2 wrong. Scoring subdivisions was tried and rejected: 38 correct, 3 refused, 1 wrong, but it broke 174 BPM.
 - L9: Delivery note: three new schema changes (RateLimit table, track and vinyl columns, enums, FolderVinyl.trackId) need `bun run db:push` before deploying. Not run on any real database.
+- L10: Four screen writers ran in parallel with disjoint surfaces. The collection writer hung on the shared Chrome DevTools browser after 05:25 and was stopped at 06:38; its code was complete and was verified directly. The disk was nearly full (117 MiB free) because of data outside this work; writer scratch was removed, 3.9 GiB free afterwards.
+- L11: Found in the browser and fixed: hydration errors on every prefetched screen, because pending queries were dehydrated while components read them with useQuery. Prefetch is now awaited. Root `loading.tsx` made missing pages answer 200; removing it restored real 404s.
+- L12: End-to-end flows checked in a real browser against a seeded database: password sign-in, editing a record (track BPM, source, key, energy and cue notes survive), manual BPM with key "Am" stored as 8A and MANUAL, DJ profile save, choosing a cut in a set, a real Deezer lookup that honestly reports nothing found. No console errors other than Vercel Analytics, which only exists on Vercel.
+- L13: Totals at the end: 358 tests pass, ESLint 0 problems (166 at the start), `tsc` clean in every package, `bun audit` none (34 at the start). UI work landed as 23 commits sized for review, each type-checked on its own tree.
+- L14: Two native reviews ended `corrupted_or_unverifiable_authority` (e3 and u5). Both had two lenses captured concurrently, with the first lens closing the transaction as correction_required before the second was admitted. The findings were read from the transaction state and handled: e3's in 088708a and 87f4c3c, u5's scanner finding in e1c1a97 (false positive in context, hardened anyway).
