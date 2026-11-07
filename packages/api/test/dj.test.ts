@@ -284,7 +284,7 @@ describe.skipIf(!hasDatabase)("per-track BPM", () => {
     const { tracks } = await caller.vinylGet({ id: vinyl.id });
     await caller.trackUpdate({ id: tracks[0]!.id, bpm: 126, bpmSource: "LOOKUP", camelotKey: "8A" });
 
-    const expected = { bpm: 126, bpmSource: "LOOKUP", camelotKey: "8A" };
+    const expected = { bpm: 126, bpmSource: "LOOKUP", camelotKey: "8A" } as const;
     expect((await caller.vinylsList({})).items[0]?.tracks).toEqual([expected]);
     expect((await caller.folderGet({ id: folder.id })).vinyls[0]?.tracks).toEqual([expected]);
     expect((await callerFor().publicFolders({})).items[0]?.vinyls[0]?.tracks).toEqual([expected]);

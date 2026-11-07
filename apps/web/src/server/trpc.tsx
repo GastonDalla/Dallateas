@@ -3,7 +3,7 @@ import "server-only";
 import { createContext } from "@dallateas/api/context";
 import { t } from "@dallateas/api/index";
 import { appRouter } from "@dallateas/api/routers/index";
-import { dehydrate, HydrationBoundary, type QueryClient } from "@tanstack/react-query";
+import { dehydrate, HydrationBoundary, type FetchQueryOptions } from "@tanstack/react-query";
 import { createTRPCOptionsProxy } from "@trpc/tanstack-react-query";
 import { headers } from "next/headers";
 import { cache, type ReactNode } from "react";
@@ -27,9 +27,9 @@ export const serverTrpc = createTRPCOptionsProxy({
 });
 
 /** Starts queries for the client components below, without blocking the render. */
-export function prefetch(...queries: Parameters<QueryClient["prefetchQuery"]>[0][]) {
+export function prefetch(...queries: { queryKey: readonly unknown[] }[]) {
   const queryClient = getServerQueryClient();
-  for (const query of queries) void queryClient.prefetchQuery(query);
+  for (const query of queries) void queryClient.prefetchQuery(query as FetchQueryOptions);
 }
 
 export function HydrateClient({ children }: { children: ReactNode }) {
