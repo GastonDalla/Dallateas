@@ -1,25 +1,23 @@
-import { auth } from "@dallateas/auth";
-import { headers } from "next/headers";
-import { redirect } from "next/navigation";
-
-import FoldersPageClient from "./pageClient";
-
 import type { Metadata } from "next";
 
+import { requireSession } from "@/server/session";
+import { HydrateClient, prefetch, serverTrpc } from "@/server/trpc";
+
+import { FoldersView } from "./folders-view";
+
 export const metadata: Metadata = {
-  title: "Mis carpetas",
+  title: "Carpetas",
   robots: { index: false, follow: false },
 };
 
 export default async function FoldersPage() {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  });
+  await requireSession();
 
-  if (!session?.user) {
-    redirect("/login");
-  }
+  await prefetch(serverTrpc.foldersList.queryOptions(), serverTrpc.myCollaborations.queryOptions());
 
-  return <FoldersPageClient />;
+  return (
+    <HydrateClient>
+      <FoldersView />
+    </HydrateClient>
+  );
 }
-
