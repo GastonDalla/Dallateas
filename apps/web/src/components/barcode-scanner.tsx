@@ -36,8 +36,14 @@ export function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps) {
   const [scanning, setScanning] = useState(false);
   const haptic = useHaptic();
 
+  const decodedRef = useRef(false);
+
+  // The camera keeps decoding ten times a second until it stops, so only the first read counts.
   const handleScan = useEffectEvent((code: string) => {
+    if (decodedRef.current) return;
+    decodedRef.current = true;
     haptic.trigger("success");
+    void stopScanner(scannerRef.current);
     onScan(code);
   });
 
