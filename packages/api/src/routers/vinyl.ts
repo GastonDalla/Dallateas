@@ -4,11 +4,18 @@ import { z } from "zod";
 
 import { protectedProcedure, router } from "../index";
 import { consumeRateLimit } from "../rate-limit";
-import { recordId, tagName, trackInput, vinylInput } from "../schemas";
+import { camelotKey, recordId, tagName, trackInput, vinylInput } from "../schemas";
 
 const folderSummary = {
   select: { folder: { select: { id: true, name: true, type: true, color: true } } },
 } satisfies Prisma.Vinyl$foldersArgs;
+
+/** What a cover sticker needs, so a listing never has to load whole tracklists. */
+const stickerTracks = {
+  select: { bpm: true, bpmSource: true, camelotKey: true },
+  where: { bpm: { not: null } },
+  orderBy: { position: "asc" },
+} satisfies Prisma.Vinyl$tracksArgs;
 
 const relations = {
   folderIds: z.array(recordId).max(50).optional(),
@@ -99,6 +106,9 @@ export const vinylRouter = router({
           styles: z.array(z.string().max(100)).max(20).optional(),
           tagId: recordId.optional(),
           tagIds: z.array(recordId).max(20).optional(),
+          bpmMin: z.number().min(20).max(400).optional(),
+          bpmMax: z.number().min(20).max(400).optional(),
+          keys: z.array(camelotKey).max(24).optional(),
           limit: z.number().int().min(1).max(200).default(100),
           cursor: recordId.optional(),
         })
@@ -128,6 +138,14 @@ export const vinylRouter = router({
 
       if (input?.barcode) where.barcode = input.barcode;
 
+      // One cut has to meet every condition: a 126 on side A and an 8A on side B are not a 126 in 8A.
+      const trackConditions: Prisma.VinylTrackWhereInput = {};
+      if (input?.bpmMin !== undefined || input?.bpmMax !== undefined) {
+        trackConditions.bpm = { gte: input.bpmMin, lte: input.bpmMax };
+      }
+      if (input?.keys?.length) trackConditions.camelotKey = { in: input.keys };
+      if (Object.keys(trackConditions).length > 0) where.tracks = { some: trackConditions };
+
       const vinyls = await prisma.vinyl.findMany({
         where,
         take: limit + 1,
@@ -136,6 +154,7 @@ export const vinylRouter = router({
         include: {
           folders: folderSummary,
           tags: { include: { tag: true } },
+          tracks: stickerTracks,
         },
       });
 
@@ -143,6 +162,29 @@ export const vinylRouter = router({
       const items = hasMore ? vinyls.slice(0, limit) : vinyls;
       return { items, nextCursor: hasMore ? items.at(-1)?.id : undefined };
     }),
+
+  collectionExport: protectedProcedure.query(async ({ ctx }) =>
+    prisma.vinyl.findMany({
+      where: { userId: ctx.session.user.id },
+      orderBy: [{ artist: "asc" }, { title: "asc" }],
+      select: {
+        title: true,
+        artist: true,
+        label: true,
+        genre: true,
+        style: true,
+        year: true,
+        rpm: true,
+        mediaCondition: true,
+        sleeveCondition: true,
+        location: true,
+        tracks: {
+          select: { side: true, title: true, duration: true, bpm: true, bpmSource: true, camelotKey: true, energy: true },
+          orderBy: { position: "asc" },
+        },
+      },
+    }),
+  ),
 
   vinylCheckDuplicate: protectedProcedure
     .input(

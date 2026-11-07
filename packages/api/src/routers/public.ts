@@ -20,7 +20,20 @@ const previewFolderInclude = {
   vinyls: {
     select: {
       vinyl: {
-        select: { id: true, title: true, artist: true, genre: true, style: true, coverUrl: true, year: true },
+        select: {
+          id: true,
+          title: true,
+          artist: true,
+          genre: true,
+          style: true,
+          coverUrl: true,
+          year: true,
+          tracks: {
+            select: { bpm: true, bpmSource: true, camelotKey: true },
+            where: { bpm: { not: null } },
+            orderBy: { position: "asc" },
+          },
+        },
       },
     },
     orderBy: { position: "asc" },
@@ -181,7 +194,7 @@ export const publicRouter = router({
                 label: true,
                 bpm: true,
                 tracks: {
-                  select: { bpm: true, camelotKey: true },
+                  select: { bpm: true, bpmSource: true, camelotKey: true },
                   where: { bpm: { not: null } },
                   orderBy: { position: "asc" },
                 },

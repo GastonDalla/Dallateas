@@ -248,6 +248,60 @@ describe.skipIf(!hasDatabase)("per-track BPM", () => {
     });
   });
 
+  test("the collection filters by tempo and key on any cut of a record", async () => {
+    const owner = await createUser();
+    const caller = callerFor({ id: owner.id });
+    const match = await createVinyl(owner.id, [], { title: "Match", tracks: twoTracks });
+    const other = await createVinyl(owner.id, [], { title: "Other", tracks: twoTracks });
+    const matchTracks = (await caller.vinylGet({ id: match.id })).tracks;
+    const otherTracks = (await caller.vinylGet({ id: other.id })).tracks;
+    await caller.trackUpdate({ id: matchTracks[1]!.id, bpm: 126, camelotKey: "8A" });
+    await caller.trackUpdate({ id: otherTracks[0]!.id, bpm: 126, camelotKey: "2B" });
+
+    const byTempo = await caller.vinylsList({ bpmMin: 124, bpmMax: 128 });
+    const byBoth = await caller.vinylsList({ bpmMin: 124, bpmMax: 128, keys: ["8A"] });
+
+    expect(byTempo.items).toHaveLength(2);
+    expect(byBoth.items.map((vinyl) => vinyl.id)).toEqual([match.id]);
+  });
+
+  test("a tempo and a key must sit on the same cut to match", async () => {
+    const owner = await createUser();
+    const caller = callerFor({ id: owner.id });
+    const vinyl = await createVinyl(owner.id, [], { tracks: twoTracks });
+    const { tracks } = await caller.vinylGet({ id: vinyl.id });
+    await caller.trackUpdate({ id: tracks[0]!.id, bpm: 126 });
+    await caller.trackUpdate({ id: tracks[1]!.id, bpm: 140, camelotKey: "8A" });
+
+    expect((await caller.vinylsList({ bpmMin: 124, bpmMax: 128, keys: ["8A"] })).items).toEqual([]);
+  });
+
+  test("listings carry the tempo that the cover sticker shows", async () => {
+    const owner = await createUser();
+    const caller = callerFor({ id: owner.id });
+    const folder = await createFolder(owner.id);
+    const vinyl = await createVinyl(owner.id, [folder.id], { tracks: twoTracks });
+    const { tracks } = await caller.vinylGet({ id: vinyl.id });
+    await caller.trackUpdate({ id: tracks[0]!.id, bpm: 126, bpmSource: "LOOKUP", camelotKey: "8A" });
+
+    const expected = { bpm: 126, bpmSource: "LOOKUP", camelotKey: "8A" };
+    expect((await caller.vinylsList({})).items[0]?.tracks).toEqual([expected]);
+    expect((await caller.folderGet({ id: folder.id })).vinyls[0]?.tracks).toEqual([expected]);
+    expect((await callerFor().publicFolders({})).items[0]?.vinyls[0]?.tracks).toEqual([expected]);
+  });
+
+  test("the export lists every cut of the DJ's own records", async () => {
+    const owner = await createUser();
+    const stranger = await createUser();
+    await createVinyl(owner.id, [], { tracks: twoTracks });
+    await createVinyl(stranger.id, [], { title: "Foreign", tracks: twoTracks });
+
+    const rows = await callerFor({ id: owner.id }).collectionExport();
+
+    expect(rows.map((row) => row.title)).toEqual(["Minus"]);
+    expect(rows[0]?.tracks.map((track) => track.side)).toEqual(["A1", "B1"]);
+  });
+
   test("the stats describe the tracks and say how much is approximate", async () => {
     const owner = await createUser();
     const caller = callerFor({ id: owner.id });

@@ -21,7 +21,20 @@ export const folderRouter = router({
     const folder = await prisma.folder.findUnique({
       where: { id: input.id },
       include: {
-        vinyls: { select: { vinyl: true }, orderBy: { position: "asc" } },
+        vinyls: {
+          select: {
+            vinyl: {
+              include: {
+                tracks: {
+                  select: { bpm: true, bpmSource: true, camelotKey: true },
+                  where: { bpm: { not: null } },
+                  orderBy: { position: "asc" },
+                },
+              },
+            },
+          },
+          orderBy: { position: "asc" },
+        },
         _count: { select: { vinyls: true } },
         user: { select: { id: true, name: true } },
       },
