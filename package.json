@@ -35,7 +35,7 @@
     "db:generate": "turbo -F @dallateas/db db:generate",
     "db:migrate": "turbo -F @dallateas/db db:migrate",
     "lint": "turbo lint",
-    "test": "bun test packages"
+    "test": "bun test packages apps"
   },
   "devDependencies": {
     "@types/node": "^24",
