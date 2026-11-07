@@ -12,14 +12,14 @@ import {
   username,
 } from "better-auth/plugins";
 
+import { hasSignUpProof, signUpProofCookie } from "./sign-up-proof";
 import {
   magicLinkEmailHtml,
   otpEmailHtml,
   sendEmail,
 } from "./email";
 
-/** How long a sign-up code stays valid. An unverified account older than this has been abandoned. */
-const VERIFICATION_WINDOW_SECONDS = 600;
+const OTP_EXPIRY_SECONDS = 600;
 
 export const auth = betterAuth({
   database: prismaAdapter(prisma, {
@@ -75,19 +75,27 @@ export const auth = betterAuth({
     },
   },
 
+  emailVerification: {
+    // A code proves who owns an email, not who chose the password. Someone can register a
+    // stranger's address and wait for them to verify it, so a password only survives if it was
+    // set from the browser that verifies. This runs after the code is accepted, so a wrong code
+    // cannot strip anyone's credential. The owner can always get in through a code or a reset.
+    beforeEmailVerification: async (user, request) => {
+      if (user.emailVerified || hasSignUpProof(request?.headers.get("cookie"), user.id)) return;
+      await prisma.$transaction([
+        prisma.account.deleteMany({ where: { userId: user.id, providerId: "credential" } }),
+        prisma.session.deleteMany({ where: { userId: user.id } }),
+      ]);
+    },
+  },
+
   hooks: {
-    // Someone can register a stranger's email and wait. If the stranger later verified it, the
-    // attacker's password would still open the account. A new sign-up replaces an abandoned,
-    // unverified account, so the password that survives belongs to whoever proves the email.
-    before: createAuthMiddleware(async (ctx) => {
-      if (ctx.path !== "/sign-up/email" || typeof ctx.body?.email !== "string") return;
-      await prisma.user.deleteMany({
-        where: {
-          email: ctx.body.email.toLowerCase(),
-          emailVerified: false,
-          createdAt: { lt: new Date(Date.now() - VERIFICATION_WINDOW_SECONDS * 1000) },
-        },
-      });
+    after: createAuthMiddleware(async (ctx) => {
+      if (ctx.path !== "/sign-up/email") return;
+      const created = ctx.context.returned as { user?: { id: string } } | undefined;
+      if (!created?.user) return;
+      const { name, value, options } = signUpProofCookie(created.user.id);
+      ctx.setCookie(name, value, options);
     }),
   },
 
@@ -110,7 +118,7 @@ export const auth = betterAuth({
     username(),
     emailOTP({
       otpLength: 6,
-      expiresIn: VERIFICATION_WINDOW_SECONDS,
+      expiresIn: OTP_EXPIRY_SECONDS,
       sendVerificationOnSignUp: true,
       overrideDefaultEmailVerification: true,
       async sendVerificationOTP({ email, otp, type }) {

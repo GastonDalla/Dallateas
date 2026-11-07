@@ -41,9 +41,14 @@ export const folderRouter = router({
       collaboratorRole = collaborator.role;
     }
 
+    // Collaborators share the crate, not what the owner paid or their mix notes.
+    const seesPrivateFields = isOwner || isAdmin;
+
     return {
       ...toClientFolder(folder),
-      vinyls: folder.vinyls.map(({ vinyl }) => vinyl),
+      vinyls: folder.vinyls.map(({ vinyl }) =>
+        seesPrivateFields ? vinyl : { ...vinyl, pricePaid: null, mixNotes: null },
+      ),
       isOwner,
       collaboratorRole,
       owner: folder.user,

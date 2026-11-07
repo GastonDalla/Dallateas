@@ -45,7 +45,7 @@ export const optionalHttpUrl = (maxLength = 500) => z.union([z.literal(""), http
 /** A photo taken in the app. The client downsizes it first, so it stays small enough to store inline. */
 const capturedCover = z
   .string()
-  .max(200_000)
+  .max(100_000)
   .regex(/^data:image\/(jpeg|webp);base64,[A-Za-z0-9+/=]+$/);
 
 export const dateString = z

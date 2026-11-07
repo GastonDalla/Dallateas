@@ -130,6 +130,58 @@ describe.skipIf(!hasDatabase)("folder and vinyl access control", () => {
     await expectTrpcError(caller.folderUnlock({ id: folder.id, password: "secret-word" }), "TOO_MANY_REQUESTS");
   });
 
+  test("one visitor past their limit cannot lock a folder for everyone else", async () => {
+    const owner = await createUser();
+    const folder = await createFolder(owner.id, { password: "secret-word" });
+    const attacker = visitor("10.9.9.1").caller;
+
+    for (let attempt = 0; attempt < 110; attempt += 1) {
+      await attacker.folderUnlock({ id: folder.id, password: "wrong" }).catch(() => undefined);
+    }
+
+    const { caller, setCookies } = visitor("10.9.9.2");
+    await caller.folderUnlock({ id: folder.id, password: "secret-word" });
+    expect(setCookies).toHaveLength(1);
+  });
+
+  test("filtering the listing by genre cannot reveal what a locked folder holds", async () => {
+    const owner = await createUser();
+    const folder = await createFolder(owner.id, { password: "secret-word" });
+    await createVinyl(owner.id, [folder.id], { genre: "Techno" });
+
+    const { items } = await callerFor().publicFolders({ genre: "Techno" });
+
+    expect(items).toEqual([]);
+  });
+
+  test("listings leave out inline photos, which are too heavy to send in bulk", async () => {
+    const owner = await createUser();
+    const folder = await createFolder(owner.id);
+    await createVinyl(owner.id, [folder.id], { coverUrl: "data:image/jpeg;base64,AAAA" });
+
+    const { items } = await callerFor().publicFolders({});
+
+    expect(items[0]?.vinyls[0]?.coverUrl).toBeNull();
+  });
+
+  test("a view for a folder that does not exist leaves no trace", async () => {
+    await callerFor().folderRecordView({ id: "missing-folder" });
+
+    expect(await prisma.rateLimit.count()).toBe(0);
+  });
+
+  test("collaborators do not see what the owner paid or their mix notes", async () => {
+    const owner = await createUser();
+    const guest = await createUser();
+    const folder = await createFolder(owner.id, { visibility: "PRIVATE" });
+    await createVinyl(owner.id, [folder.id]);
+    await callerFor({ id: owner.id }).folderInvite({ folderId: folder.id, email: guest.email, role: "VIEWER" });
+
+    const { vinyls } = await callerFor({ id: guest.id }).folderGet({ id: folder.id });
+
+    expect(vinyls[0]).toMatchObject({ pricePaid: null, mixNotes: null });
+  });
+
   test("an owner can remove a collaborator and change their role", async () => {
     const owner = await createUser();
     const guest = await createUser();

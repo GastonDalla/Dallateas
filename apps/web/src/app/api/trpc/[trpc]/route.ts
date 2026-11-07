@@ -8,6 +8,7 @@ function handler(req: NextRequest) {
     endpoint: "/api/trpc",
     req,
     router: appRouter,
+    maxBatchSize: 30,
     createContext: ({ resHeaders }) => createContext({ headers: req.headers, resHeaders }),
   });
 }

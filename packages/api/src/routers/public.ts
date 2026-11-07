@@ -9,7 +9,7 @@ import {
   verifyFolderPassword,
 } from "../folder-access";
 import { publicProcedure, router } from "../index";
-import { consumeRateLimit } from "../rate-limit";
+import { consumeRateLimit, isRateLimited } from "../rate-limit";
 import { recordId } from "../schemas";
 
 const UNLOCK_WINDOW_MS = 15 * 60 * 1000;
@@ -31,6 +31,11 @@ const previewFolderInclude = {
 
 type PreviewFolder = Prisma.FolderGetPayload<{ include: typeof previewFolderInclude }>;
 
+/** Photos taken in the app are stored inline, which is fine for one record but heavy across a listing. */
+function withoutInlineCover<T extends { coverUrl: string | null }>(vinyl: T) {
+  return vinyl.coverUrl?.startsWith("data:") ? { ...vinyl, coverUrl: null } : vinyl;
+}
+
 function toPublicPreview(folder: PreviewFolder) {
   const hasPassword = folder.password !== null;
   return {
@@ -45,7 +50,7 @@ function toPublicPreview(folder: PreviewFolder) {
     owner: folder.user,
     vinylCount: folder._count.vinyls,
     // A locked folder may be listed, but its records are what the password protects.
-    vinyls: hasPassword ? [] : folder.vinyls.map(({ vinyl }) => vinyl),
+    vinyls: hasPassword ? [] : folder.vinyls.map(({ vinyl }) => withoutInlineCover(vinyl)),
   };
 }
 
@@ -122,7 +127,11 @@ export const publicRouter = router({
         ];
       }
       if (input?.type) where.type = input.type;
-      if (input?.genre) where.vinyls = { some: { vinyl: { genre: input.genre } } };
+      if (input?.genre) {
+        // Matching on contents would reveal what a locked folder holds.
+        where.password = null;
+        where.vinyls = { some: { vinyl: { genre: input.genre } } };
+      }
 
       const folders = await prisma.folder.findMany({
         where,
@@ -225,15 +234,20 @@ export const publicRouter = router({
         throw new TRPCError({ code: "NOT_FOUND", message: "Batea no encontrada" });
       }
 
-      const [perVisitor, perFolder] = await Promise.all([
-        consumeRateLimit(`unlock:${folder.id}:${ctx.ip}`, { limit: 10, windowMs: UNLOCK_WINDOW_MS }),
-        consumeRateLimit(`unlock:${folder.id}`, { limit: 100, windowMs: UNLOCK_WINDOW_MS }),
-      ]);
-      if (!perVisitor || !perFolder) {
+      // The folder-wide limit stops guessing spread over many addresses. Only failures from a
+      // visitor still within their own limit spend it, so one client cannot lock everyone out.
+      const folderLimit = { limit: 100, windowMs: UNLOCK_WINDOW_MS };
+      const folderKey = `unlock:${folder.id}`;
+      const withinLimits =
+        (await consumeRateLimit(`${folderKey}:${ctx.ip}`, { limit: 10, windowMs: UNLOCK_WINDOW_MS })) &&
+        !(await isRateLimited(folderKey, folderLimit));
+
+      if (!withinLimits) {
         throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "Demasiados intentos. Probá de nuevo más tarde." });
       }
 
       if (!(await verifyFolderPassword(input.password, folder.password))) {
+        await consumeRateLimit(folderKey, folderLimit);
         throw new TRPCError({ code: "UNAUTHORIZED", message: "Contraseña incorrecta" });
       }
 
@@ -242,10 +256,13 @@ export const publicRouter = router({
     }),
 
   folderRecordView: publicProcedure.input(z.object({ id: recordId })).mutation(async ({ ctx, input }) => {
+    const exists = await prisma.folder.count({ where: { id: input.id, visibility: { not: "PRIVATE" } } });
+    if (!exists) return { success: true };
+
     const fresh = await consumeRateLimit(`view:folder:${input.id}:${ctx.ip}`, { limit: 1, windowMs: VIEW_WINDOW_MS });
     if (fresh) {
       // Raw on purpose: a Prisma update would touch `updatedAt`, which orders the public listing.
-      await prisma.$executeRaw`UPDATE "Folder" SET "viewCount" = "viewCount" + 1 WHERE "id" = ${input.id} AND "visibility" <> 'PRIVATE'`;
+      await prisma.$executeRaw`UPDATE "Folder" SET "viewCount" = "viewCount" + 1 WHERE "id" = ${input.id}`;
     }
     return { success: true };
   }),

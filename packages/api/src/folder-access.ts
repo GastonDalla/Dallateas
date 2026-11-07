@@ -32,7 +32,7 @@ function unlockCookieName(folderId: string) {
 // Signing the stored hash means changing the password invalidates every earlier unlock.
 function unlockSignature(folderId: string, passwordHash: string, expiresAt: number) {
   return createHmac("sha256", env.BETTER_AUTH_SECRET)
-    .update(`${folderId}.${expiresAt}.${passwordHash}`)
+    .update(`folder-unlock.${folderId}.${expiresAt}.${passwordHash}`)
     .digest("base64url");
 }
 

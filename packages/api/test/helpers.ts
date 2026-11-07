@@ -37,10 +37,15 @@ export async function createUser(overrides: { username?: string; role?: string; 
   });
 }
 
-function buildCaller(user: TestUser | undefined, cookies: Record<string, string>, setCookies: string[]) {
+function buildCaller(
+  user: TestUser | undefined,
+  cookies: Record<string, string>,
+  setCookies: string[],
+  ip = `10.0.0.${(sequence % 250) + 1}`,
+) {
   return createCaller({
     session: user ? ({ user: { id: user.id, role: user.role ?? "user" } } as never) : null,
-    ip: `10.0.0.${(sequence % 250) + 1}`,
+    ip,
     cookies,
     setCookie: (value: string) => setCookies.push(value),
   } as never);
@@ -51,9 +56,9 @@ export function callerFor(user?: TestUser, cookies: Record<string, string> = {})
 }
 
 /** A caller that also exposes the cookies the server asked the browser to store. */
-export function visitor() {
+export function visitor(ip?: string) {
   const setCookies: string[] = [];
-  return { caller: buildCaller(undefined, {}, setCookies), setCookies };
+  return { caller: buildCaller(undefined, {}, setCookies, ip), setCookies };
 }
 
 export function cookiePair(setCookie: string) {

@@ -4,7 +4,7 @@ import { Camera, RotateCcw, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 /** Longest side of a captured cover. Photos are stored inline, so they have to stay small. */
-const MAX_COVER_SIZE = 480;
+const MAX_COVER_SIZE = 400;
 
 interface CameraCaptureProps {
   onCapture: (dataUrl: string) => void;
@@ -53,7 +53,7 @@ export function CameraCapture({ onCapture, onClose }: CameraCaptureProps) {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
     ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
-    const dataUrl = canvas.toDataURL("image/jpeg", 0.72);
+    const dataUrl = canvas.toDataURL("image/jpeg", 0.65);
     onCapture(dataUrl);
     streamRef.current?.getTracks().forEach((t) => t.stop());
     onClose();

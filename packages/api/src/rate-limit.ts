@@ -31,6 +31,12 @@ export async function consumeRateLimit(key: string, { limit, windowMs }: Limit):
   return (row?.count ?? 0) <= limit;
 }
 
+/** Reads a limit without counting an attempt, for limits that only failures should spend. */
+export async function isRateLimited(key: string, { limit, windowMs }: Limit): Promise<boolean> {
+  const row = await prisma.rateLimit.findUnique({ where: { key }, select: { count: true, lastRequest: true } });
+  return row !== null && Number(row.lastRequest) >= Date.now() - windowMs && row.count >= limit;
+}
+
 const memoryHits = new Map<string, { count: number; resetAt: number }>();
 
 /**

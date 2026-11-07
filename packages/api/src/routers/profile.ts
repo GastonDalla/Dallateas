@@ -247,6 +247,9 @@ export const profileRouter = router({
     }),
 
   djProfileRecordView: publicProcedure.input(z.object({ id: recordId })).mutation(async ({ ctx, input }) => {
+    const exists = await prisma.djProfile.count({ where: { id: input.id } });
+    if (!exists) return { success: true };
+
     const fresh = await consumeRateLimit(`view:profile:${input.id}:${ctx.ip}`, { limit: 1, windowMs: VIEW_WINDOW_MS });
     if (fresh) {
       // Raw on purpose: a Prisma update would touch `updatedAt`, which feeds the sitemap.
