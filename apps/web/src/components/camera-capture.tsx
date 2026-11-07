@@ -1,121 +1,126 @@
 "use client";
 
+import { Button } from "@dallateas/ui/components/button";
 import { Camera, RotateCcw, X } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+
+import { Modal } from "@/components/confirm-dialog";
 
 /** Longest side of a captured cover. Photos are stored inline, so they have to stay small. */
 const MAX_COVER_SIZE = 400;
+const JPEG_QUALITY = 0.65;
 
-interface CameraCaptureProps {
+type FacingMode = "environment" | "user";
+
+type CameraCaptureProps = {
   onCapture: (dataUrl: string) => void;
   onClose: () => void;
+};
+
+function stopStream(stream: MediaStream | null) {
+  for (const track of stream?.getTracks() ?? []) track.stop();
 }
 
 export function CameraCapture({ onCapture, onClose }: CameraCaptureProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const streamRef = useRef<MediaStream | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
-  const [facingMode, setFacingMode] = useState<"environment" | "user">("environment");
-
-  const startCamera = useCallback(async (facing: "environment" | "user") => {
-    try {
-      streamRef.current?.getTracks().forEach((t) => t.stop());
-
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: facing, width: { ideal: 1280 }, height: { ideal: 960 } },
-      });
-      streamRef.current = stream;
-
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        videoRef.current.onloadedmetadata = () => setReady(true);
-      }
-    } catch {
-      setError("No se pudo acceder a la camara.");
-    }
-  }, []);
+  const [facingMode, setFacingMode] = useState<FacingMode>("environment");
 
   useEffect(() => {
-    startCamera(facingMode);
+    let stream: MediaStream | null = null;
+    let cancelled = false;
+
+    async function start() {
+      try {
+        const opened = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode, width: { ideal: 1280 }, height: { ideal: 960 } },
+        });
+        if (cancelled) {
+          stopStream(opened);
+          return;
+        }
+        stream = opened;
+        if (videoRef.current) videoRef.current.srcObject = opened;
+      } catch {
+        if (!cancelled) setError("No se pudo acceder a la cámara");
+      }
+    }
+
+    void start();
+
     return () => {
-      streamRef.current?.getTracks().forEach((t) => t.stop());
+      cancelled = true;
+      stopStream(stream);
     };
-  }, [facingMode, startCamera]);
+  }, [facingMode]);
 
   function handleCapture() {
-    if (!videoRef.current) return;
-    const { videoWidth, videoHeight } = videoRef.current;
+    const video = videoRef.current;
+    if (!video) return;
+
+    const { videoWidth, videoHeight } = video;
     const scale = Math.min(1, MAX_COVER_SIZE / Math.max(videoWidth, videoHeight));
     const canvas = document.createElement("canvas");
     canvas.width = Math.round(videoWidth * scale);
     canvas.height = Math.round(videoHeight * scale);
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-    ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
-    const dataUrl = canvas.toDataURL("image/jpeg", 0.65);
-    onCapture(dataUrl);
-    streamRef.current?.getTracks().forEach((t) => t.stop());
+
+    const context = canvas.getContext("2d");
+    if (!context) return;
+
+    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+    onCapture(canvas.toDataURL("image/jpeg", JPEG_QUALITY));
     onClose();
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
-      <div className="relative w-full max-w-sm overflow-hidden rounded-lg bg-background shadow-xl">
-        <div className="flex items-center justify-between border-b border-border/60 px-4 py-3">
-          <h3 className="flex items-center gap-2 text-sm font-semibold">
-            <Camera className="h-4 w-4 text-primary" />
-            Foto de portada
-          </h3>
-          <div className="flex items-center gap-1">
-            <button
-              type="button"
-              onClick={() => setFacingMode((f) => (f === "environment" ? "user" : "environment"))}
-              className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
-              title="Cambiar camara"
-            >
-              <RotateCcw className="h-4 w-4" />
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                streamRef.current?.getTracks().forEach((t) => t.stop());
-                onClose();
-              }}
-              className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          </div>
-        </div>
-
-        <div className="relative bg-black">
-          <video
-            ref={videoRef}
-            autoPlay
-            playsInline
-            muted
-            aria-label="Vista previa de camara para foto de portada"
-            className="aspect-square w-full object-cover"
-          />
-        </div>
-
-        <div className="p-4">
-          {error ? (
-            <p className="text-center text-xs text-red-500">{error}</p>
-          ) : (
-            <button
-              type="button"
-              disabled={!ready}
-              onClick={handleCapture}
-              className="flex w-full items-center justify-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 disabled:opacity-60"
-            >
-              <Camera className="h-4 w-4" />
-              Tomar foto
-            </button>
-          )}
+    <Modal label="Foto de portada" onClose={onClose}>
+      <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-2">
+        <h2 className="flex items-center gap-2 font-sans text-sm font-semibold">
+          <Camera aria-hidden="true" className="size-4 text-link" />
+          Foto de portada
+        </h2>
+        <div className="flex items-center gap-1">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="size-11 md:size-8"
+            onClick={() => setFacingMode((current) => (current === "environment" ? "user" : "environment"))}
+            aria-label="Cambiar de cámara"
+          >
+            <RotateCcw aria-hidden="true" />
+          </Button>
+          <Button type="button" variant="ghost" size="icon" className="size-11 md:size-8" onClick={onClose} aria-label="Cerrar">
+            <X aria-hidden="true" />
+          </Button>
         </div>
       </div>
-    </div>
+
+      <div className="bg-black">
+        <video
+          ref={videoRef}
+          autoPlay
+          playsInline
+          muted
+          onLoadedMetadata={() => setReady(true)}
+          aria-label="Vista previa de la cámara"
+          className="aspect-square w-full object-cover"
+        />
+      </div>
+
+      <div className="p-4">
+        {error ? (
+          <p role="alert" className="text-[13px] text-clash">
+            {error}
+          </p>
+        ) : (
+          <Button type="button" disabled={!ready} onClick={handleCapture} className="h-11 w-full gap-2 text-sm">
+            <Camera aria-hidden="true" />
+            Sacar foto
+          </Button>
+        )}
+      </div>
+    </Modal>
   );
 }

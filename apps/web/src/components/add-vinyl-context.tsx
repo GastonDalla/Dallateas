@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useState } from "react";
+import { createContext, use, useState, type ReactNode } from "react";
 
 type AddVinylContextType = {
   open: boolean;
@@ -9,34 +9,27 @@ type AddVinylContextType = {
   closeDrawer: () => void;
 };
 
-const AddVinylContext = createContext<AddVinylContextType>({
-  open: false,
-  editId: undefined,
-  openDrawer: () => {},
-  closeDrawer: () => {},
-});
+const AddVinylContext = createContext<AddVinylContextType | null>(null);
 
-export function AddVinylProvider({ children }: { children: React.ReactNode }) {
-  const [open, setOpen] = useState(false);
-  const [editId, setEditId] = useState<string | undefined>();
-
-  function openDrawer(id?: string) {
-    setEditId(id);
-    setOpen(true);
-  }
-
-  function closeDrawer() {
-    setOpen(false);
-    setEditId(undefined);
-  }
+export function AddVinylProvider({ children }: { children: ReactNode }) {
+  const [drawer, setDrawer] = useState<{ open: boolean; editId?: string }>({ open: false });
 
   return (
-    <AddVinylContext.Provider value={{ open, editId, openDrawer, closeDrawer }}>
+    <AddVinylContext
+      value={{
+        open: drawer.open,
+        editId: drawer.editId,
+        openDrawer: (editId) => setDrawer({ open: true, editId }),
+        closeDrawer: () => setDrawer({ open: false }),
+      }}
+    >
       {children}
-    </AddVinylContext.Provider>
+    </AddVinylContext>
   );
 }
 
 export function useAddVinyl() {
-  return useContext(AddVinylContext);
+  const context = use(AddVinylContext);
+  if (!context) throw new Error("useAddVinyl needs an AddVinylProvider above it");
+  return context;
 }
