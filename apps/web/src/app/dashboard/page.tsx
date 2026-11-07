@@ -1,27 +1,36 @@
-import { auth } from "@dallateas/auth";
 import type { Metadata } from "next";
-import { headers } from "next/headers";
-import { redirect } from "next/navigation";
+
+import { requireSession } from "@/server/session";
+import { HydrateClient, prefetch, serverTrpc } from "@/server/trpc";
 
 import Dashboard from "./dashboard";
+import { paramsFromPage, parseFilters, toVinylsListInput } from "./filters";
 
 export const metadata: Metadata = {
-  title: "Mi coleccion",
+  title: "Mi colección",
   robots: { index: false, follow: false },
 };
 
-export default async function DashboardPage() {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  });
+type DashboardPageProps = {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+};
 
-  if (!session?.user) {
-    redirect("/login");
-  }
+export default async function DashboardPage({ searchParams }: DashboardPageProps) {
+  await requireSession();
+  const filters = parseFilters(paramsFromPage(await searchParams));
 
-  if (!session.user.emailVerified) {
-    redirect(`/verify-email?email=${encodeURIComponent(session.user.email)}`);
-  }
+  await prefetch(
+    serverTrpc.vinylsList.queryOptions(toVinylsListInput(filters)),
+    serverTrpc.foldersList.queryOptions(),
+    serverTrpc.collectionStats.queryOptions(),
+    serverTrpc.userGenres.queryOptions(),
+    serverTrpc.userStyles.queryOptions(),
+    serverTrpc.tagsList.queryOptions(),
+  );
 
-  return <Dashboard />;
+  return (
+    <HydrateClient>
+      <Dashboard />
+    </HydrateClient>
+  );
 }
