@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, test } from "bun:test";
 import { auth } from "@dallateas/auth";
 import prisma from "@dallateas/db";
 
-import { hasDatabase, resetDatabase } from "./helpers";
+import { callerFor, createUser, hasDatabase, resetDatabase } from "./helpers";
 
 const VERIFICATION_WINDOW_MS = 10 * 60 * 1000;
 
@@ -18,6 +18,23 @@ async function canSignIn(email: string, password: string) {
 
 describe.skipIf(!hasDatabase)("accounts", () => {
   beforeEach(resetDatabase);
+
+  test("after an admin resets a password the user can sign in with it", async () => {
+    await auth.api.signUpEmail({ body: { name: "Member", email: "member@example.com", password: "first-Passw0rd!x" } });
+    const member = await prisma.user.update({
+      where: { email: "member@example.com" },
+      data: { emailVerified: true },
+    });
+    const admin = await createUser({ role: "admin" });
+
+    await callerFor({ id: admin.id, role: "admin" }).adminUpdateUser({
+      userId: member.id,
+      password: "second-Passw0rd!y",
+    });
+
+    expect(await canSignIn("member@example.com", "second-Passw0rd!y")).toBe(true);
+    expect(await canSignIn("member@example.com", "first-Passw0rd!x")).toBe(false);
+  });
 
   test("an abandoned unverified sign-up cannot keep the attacker's password on the victim's account", async () => {
     const email = "victim@example.com";

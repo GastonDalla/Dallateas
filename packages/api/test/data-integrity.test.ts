@@ -128,4 +128,75 @@ describe.skipIf(!hasDatabase)("collection data integrity", () => {
 
     await expectTrpcError(caller.tagRename({ id: first.id, name: "peak" }), "CONFLICT");
   });
+
+  test("a gig with an unreadable date is rejected", async () => {
+    const owner = await createUser();
+    const caller = callerFor({ id: owner.id });
+    await caller.djProfileUpdate({ slug: "someone" });
+
+    await expectTrpcError(caller.djGigCreate({ name: "Club", date: "not-a-date" }), "BAD_REQUEST");
+  });
+
+  test("links must be http or https", async () => {
+    const owner = await createUser();
+    const caller = callerFor({ id: owner.id });
+
+    await expectTrpcError(caller.djProfileUpdate({ websiteUrl: "javascript:alert(1)" }), "BAD_REQUEST");
+    await expectTrpcError(
+      caller.djProfileUpdate({ socialLinks: [{ platform: "web", url: "javascript:alert(1)" }] }),
+      "BAD_REQUEST",
+    );
+    await expectTrpcError(
+      caller.vinylCreate({ title: "A", artist: "B", coverUrl: "javascript:alert(1)" }),
+      "BAD_REQUEST",
+    );
+  });
+
+  test("a link typed without a scheme is stored as https", async () => {
+    const owner = await createUser();
+    const caller = callerFor({ id: owner.id });
+
+    await caller.djProfileUpdate({ websiteUrl: "example.com/me" });
+
+    expect((await caller.djProfileGet())?.websiteUrl).toBe("https://example.com/me");
+  });
+
+  test("links saved before validation existed are dropped when shown publicly", async () => {
+    const owner = await createUser();
+    await prisma.djProfile.create({
+      data: {
+        userId: owner.id,
+        slug: "legacy",
+        isPublic: true,
+        websiteUrl: "javascript:alert(1)",
+        socialLinks: JSON.stringify([
+          { platform: "web", url: "javascript:alert(1)" },
+          { platform: "web", url: "https://example.com" },
+        ]),
+      },
+    });
+
+    const profile = await callerFor().djProfilePublic({ slug: "legacy" });
+
+    expect(profile.websiteUrl).toBeNull();
+    expect(profile.socialLinks.map((link) => link.url)).toEqual(["https://example.com"]);
+  });
+
+  test("a profile slug cannot impersonate another user's username", async () => {
+    await createUser({ username: "victim" });
+    const attacker = await createUser();
+
+    await expectTrpcError(callerFor({ id: attacker.id }).djProfileUpdate({ slug: "victim" }), "CONFLICT");
+  });
+
+  test("updating one profile field leaves the others alone", async () => {
+    const owner = await createUser();
+    const caller = callerFor({ id: owner.id });
+    await caller.djProfileUpdate({ slug: "someone", bio: "Selector", isPublic: true });
+
+    await caller.djProfileUpdate({ location: "Rosario" });
+
+    const profile = await caller.djProfileGet();
+    expect(profile).toMatchObject({ slug: "someone", bio: "Selector", isPublic: true, location: "Rosario" });
+  });
 });

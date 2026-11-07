@@ -20,8 +20,8 @@ Test runner: `bun test`, integration tests against a scratch Postgres. Engram mi
 
 | ID | Specs | Task | Route | Status | Commit |
 | --- | --- | --- | --- | --- | --- |
-| T1 | S5, S7 | Repo hygiene: tracked lockfile, untrack generated client, lint, test and type-check scripts | inline | pending | |
-| T2 | S6, S7 | Update every package, replace next-pwa with a hand-written service worker, `bun audit` clean | inline | pending | |
+| T1 | S5, S7 | Repo hygiene: tracked lockfile, untrack generated client, lint, test and type-check scripts | inline | done | 7d617a6 |
+| T2 | S6, S7 | Update every package, replace next-pwa with a hand-written service worker, `bun audit` clean | inline | done | 7a55029 |
 | T3 | S5, S6 | Split the god router, add `adminProcedure`, fix authorization, data leaks, XSS, password handling, rate limits, headers | inline | pending | |
 | T4 | S1 | Server Components and prefetch for public pages, per-request QueryClient, next/image, typed routes, metadata | pending route | pending | |
 | T5 | S4 | Per-track BPM and key: schema, API, form, display, lookup with source | inline | pending | |
@@ -34,3 +34,5 @@ Test runner: `bun test`, integration tests against a scratch Postgres. Engram mi
 - L1 (2026-11-07), user request verbatim: "Quiero que revises este codigo, que busques malas practicas de next.js y react y las arregles a todas, usa todas mis skills, quiero que mejores el diseno usa, mis skills de diseno y anti ai slop, quiero que pongas los bpm que tiene cada track del vinilo y quiero que mejores todo el codigo y lo dejes profesional y perfecto. Tambien haz auditorias de seguridad y actualiza todos los packages, y sugiereme cosas para agregarle y agrega cosas que le servirian a las personas que tocan y son dj con vinilos"
 - L2: Baseline. `tsc` clean; `next build` fails without a database because `sitemap.ts` queries Prisma at prerender; `bun audit` reports 34 vulnerabilities (2 critical, 14 high, 15 moderate, 3 low).
 - L3: BPM sources measured. Discogs tracklist has no BPM (`position`, `type_`, `title`, `duration`). Deezer matched 8 of 8 sample DJ tracks and returned a BPM for 4 of 8 (`0` otherwise), no API key needed. Spotify audio features were removed in 2024. Decision: three inputs, each stored with its source: lookup (approximate), tap tempo, microphone.
+- L4: T1/T2 verified: tsc clean in 6 packages, `next build` passes with Turbopack and no database, `bun audit` reports none. TypeScript held at 6.0.3 because typescript-eslint requires <6.1.0 (TS 7 crashes it). Native review of 7a55029 approved; the mechanical 7d617a6 (lockfile and generated removal) exceeds the review context budget by itself and was not reviewed.
+- L5: T3 RED 28 of 32 tests failing against the old router, GREEN 32 of 32. `notes` stays public on public folders because the public page shows it deliberately; `mixNotes`, `pricePaid`, `barcode` and `userId` do not.

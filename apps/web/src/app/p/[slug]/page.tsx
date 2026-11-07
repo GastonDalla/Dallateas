@@ -1,4 +1,7 @@
 import type { Metadata } from "next";
+import { after } from "next/server";
+
+import { getServerCaller } from "@/server/trpc";
 
 import DjProfilePage from "./dj-profile";
 
@@ -18,5 +21,16 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function ProfilePublicPage({ params }: Props) {
   const { slug } = await params;
+  const caller = await getServerCaller();
+
+  after(async () => {
+    try {
+      const profile = await caller.djProfilePublic({ slug });
+      await caller.djProfileRecordView({ id: profile.id });
+    } catch {
+      // A missing or private profile has no view to record.
+    }
+  });
+
   return <DjProfilePage username={slug} />;
 }
