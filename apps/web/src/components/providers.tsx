@@ -16,13 +16,14 @@ const ReactQueryDevtools = lazy(() =>
   })),
 );
 
-export default function Providers({ children }: { children: React.ReactNode }) {
+export default function Providers({ children, nonce }: { children: React.ReactNode; nonce?: string }) {
   return (
     <ThemeProvider
       attribute="class"
       defaultTheme="light"
       enableSystem
       disableTransitionOnChange
+      nonce={nonce}
     >
       <QueryClientProvider client={queryClient}>
         <AddVinylProvider>
