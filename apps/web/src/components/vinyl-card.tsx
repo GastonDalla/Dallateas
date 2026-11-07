@@ -1,74 +1,86 @@
-"use client";
-
-import { Disc3 } from "lucide-react";
+import { cn } from "@dallateas/ui/lib/utils";
+import type { Route } from "next";
 import Link from "next/link";
-import { memo } from "react";
+import type { ReactNode } from "react";
+
+import { Cover } from "@/components/dj/cover";
+import { RecordSticker } from "@/components/dj/track-tempo";
+import { RECORD_CONDITIONS, type BPM_SOURCE_LABELS } from "@/lib/format";
 
 type VinylCardProps = {
-  id: string;
+  id?: string;
   title: string;
   artist: string;
   genre?: string | null;
   style?: string | null;
   coverUrl?: string | null;
   href?: string;
+  /** Cuts with a tempo, for the sticker. */
+  tracks?: readonly {
+    bpm: number | null;
+    bpmSource: keyof typeof BPM_SOURCE_LABELS | null;
+    camelotKey: string | null;
+  }[];
+  bpm?: number | null;
+  condition?: keyof typeof RECORD_CONDITIONS | null;
+  /** The cover's rendered width. */
+  sizes?: string;
+  priority?: boolean;
+  /** A menu for the record, outside the link so it can hold its own controls. */
+  actions?: ReactNode;
 };
 
-export const VinylCard = memo(function VinylCard({
+const GRID_SIZES = "(min-width: 1280px) 16vw, (min-width: 1024px) 18vw, (min-width: 768px) 22vw, (min-width: 640px) 30vw, 46vw";
+
+const NO_TRACKS: NonNullable<VinylCardProps["tracks"]> = [];
+
+/** A record in a crate: the sleeve with its sticker, then what you would read on the spine. */
+export function VinylCard({
   title,
   artist,
   genre,
   style,
   coverUrl,
   href,
+  tracks = NO_TRACKS,
+  bpm,
+  condition,
+  sizes = GRID_SIZES,
+  priority,
+  actions,
 }: VinylCardProps) {
+  const details = [genre, style?.split(",")[0]?.trim()].filter(Boolean).join(" · ");
+
   const content = (
-    <article className="group flex flex-col gap-1.5 rounded-lg border border-border/60 bg-card p-2 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md">
-      <div className="aspect-square w-full overflow-hidden rounded-md bg-muted">
-        {coverUrl ? (
-          <img
-            src={coverUrl}
-            alt={`${title} — ${artist}`}
-            loading="lazy"
-            decoding="async"
-            width={200}
-            height={200}
-            className="h-full w-full object-cover transition-transform group-hover:scale-105"
-          />
-        ) : (
-          <div className="flex h-full items-center justify-center">
-            <Disc3 className="h-8 w-8 text-muted-foreground/30" aria-hidden="true" />
-          </div>
+    <>
+      <div className="relative">
+        <Cover src={coverUrl} alt="" sizes={sizes} priority={priority} />
+        <RecordSticker tracks={tracks} bpm={bpm} className="absolute top-1.5 left-1.5" />
+        {condition && (
+          <span className="tabular absolute bottom-1.5 left-1.5 rounded-sm bg-background px-1.5 py-0.5 text-xs font-medium text-foreground">
+            <span className="sr-only">Estado del disco: </span>
+            {RECORD_CONDITIONS[condition].short}
+          </span>
         )}
       </div>
-      <div className="space-y-0.5">
-        <h3 className="line-clamp-2 text-xs font-semibold">{title}</h3>
-        <p className="line-clamp-1 text-[11px] text-muted-foreground">
-          {artist}
-        </p>
-        <div className="flex flex-wrap gap-1">
-          {genre && (
-            <span className="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-[10px] text-primary">
-              {genre}
-            </span>
-          )}
-          {style && (
-            <span className="inline-flex items-center rounded-full bg-accent px-2 py-0.5 text-[10px] text-accent-foreground">
-              {style.split(",")[0]?.trim()}
-            </span>
-          )}
-        </div>
+      <div className={cn("mt-2 flex flex-col", actions && "pr-9")}>
+        <h3 className="truncate font-sans text-sm font-medium transition-colors duration-[120ms] group-hover:text-link">{title}</h3>
+        <p className="truncate text-[13px] text-muted-foreground">{artist}</p>
+        {details && <p className="truncate text-[13px] text-muted-foreground">{details}</p>}
       </div>
-    </article>
+    </>
   );
 
-  if (href) {
-    return (
-      <Link href={href as any} className="block">
-        {content}
-      </Link>
-    );
-  }
-
-  return content;
-});
+  return (
+    <article className="group relative min-w-0">
+      {href ? (
+        <Link href={href as Route} className="block">
+          {content}
+        </Link>
+      ) : (
+        content
+      )}
+      {actions && <div className="absolute right-0 bottom-0">{actions}</div>}
+    </article>
+  );
+}
