@@ -122,6 +122,8 @@ export function BeatTrainer() {
   }
 
   async function start() {
+    // A second tap before the first one starts must not stack a second engine.
+    if (engineRef.current) return;
     setFailed(false);
     try {
       const engine = new BeatEngine(
@@ -139,6 +141,7 @@ export function BeatTrainer() {
       await engine.start(roundRef.current.lateBeats);
       setRunning(true);
     } catch {
+      engineRef.current = null;
       setFailed(true);
     }
   }

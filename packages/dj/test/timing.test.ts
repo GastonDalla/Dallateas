@@ -74,6 +74,11 @@ describe("set ramp", () => {
     });
   });
 
+  test("refuses a plan with more records than a night can hold", () => {
+    expect(planRamp({ startBpm: 124, endBpm: 128, minutes: 720, minutesPerRecord: 3 })?.records).toBe(240);
+    expect(planRamp({ startBpm: 124, endBpm: 128, minutes: 720, minutesPerRecord: 0.01 })).toBeNull();
+  });
+
   test("refuses empty, zero, negative and non-numeric input", () => {
     for (const input of [
       { startBpm: 0, endBpm: 128, minutes: 60, minutesPerRecord: 6 },

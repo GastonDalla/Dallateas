@@ -40,8 +40,8 @@ describe("parseMinutes", () => {
     expect(parseMinutes(" 6.25 ")).toBe(6.25);
   });
 
-  test("refuses zero, negatives, text and more than twelve hours", () => {
-    for (const value of ["", "0", "-5", "abc", "5m", "720.1"]) {
+  test("refuses less than a minute, negatives, text and more than twelve hours", () => {
+    for (const value of ["", "0", "0.5", "-5", "abc", "5m", "720.1"]) {
       expect(parseMinutes(value)).toBeNull();
     }
   });

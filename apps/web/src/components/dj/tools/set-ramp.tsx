@@ -99,10 +99,8 @@ export function SetRamp() {
   const end = parseTempo(endValue);
   const minutes = parseMinutes(minutesValue);
   const perRecord = parseMinutes(perRecordValue);
-  const plan =
-    start !== null && end !== null && minutes !== null && perRecord !== null
-      ? planRamp({ startBpm: start, endBpm: end, minutes, minutesPerRecord: perRecord })
-      : null;
+  const filled = start !== null && end !== null && minutes !== null && perRecord !== null;
+  const plan = filled ? planRamp({ startBpm: start, endBpm: end, minutes, minutesPerRecord: perRecord }) : null;
   const pitchPerChange = plan && start !== null ? (plan.stepBpm / start) * 100 : null;
 
   return (
@@ -116,7 +114,9 @@ export function SetRamp() {
 
       <div className="flex flex-col gap-4 bg-card p-5 md:p-6" aria-live="polite">
         {plan === null ? (
-          <p className="text-sm text-muted-foreground">Cargá los dos tempos y los minutos</p>
+          <p className="text-sm text-muted-foreground">
+            {filled ? "Da más de 240 discos: revisá los minutos" : "Cargá los dos tempos y los minutos"}
+          </p>
         ) : (
           <>
             <dl className="grid grid-cols-2 gap-4">

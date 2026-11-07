@@ -65,6 +65,14 @@ export class BeatEngine {
     const horizon = this.context.currentTime + LOOKAHEAD_S;
     this.clocks.forEach((clock, index) => {
       const deck = this.decks[index]!;
+      // A background tab throttles the timer. Beats that should already have sounded are skipped,
+      // not played all at once when the tab comes back.
+      const now = this.context.currentTime;
+      if (clock.next < now) {
+        const missed = Math.ceil((now - clock.next) / (60 / deck.tempo()));
+        clock.next += missed * (60 / deck.tempo());
+        clock.beat += missed;
+      }
       while (clock.next < horizon) {
         const beatLength = 60 / deck.tempo();
         this.play(deck, clock.beat, clock.next, beatLength);

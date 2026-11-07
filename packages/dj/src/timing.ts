@@ -56,12 +56,16 @@ export type RampPlan = {
   stepBpm: number;
 };
 
+/** Twelve hours of three-minute records. A plan beyond that is a typo, not a set. */
+const MAX_RECORDS = 240;
+
 /** Spreads a tempo change evenly over a set, so no single mix has to carry it. */
 export function planRamp({ startBpm, endBpm, minutes, minutesPerRecord }: RampInput): RampPlan | null {
   const valid = [startBpm, endBpm, minutes, minutesPerRecord].every((value) => Number.isFinite(value) && value > 0);
   if (!valid) return null;
 
   const records = Math.max(1, Math.ceil(minutes / minutesPerRecord));
+  if (records > MAX_RECORDS) return null;
   const stepBpm = records > 1 ? (endBpm - startBpm) / (records - 1) : 0;
   const tempos = Array.from({ length: records }, (_, index) => Math.round((startBpm + stepBpm * index) * 10) / 10);
 

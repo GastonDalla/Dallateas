@@ -16,6 +16,7 @@ export function formatSemitones(semitones: number) {
   return `${rounded > 0 ? "+" : "−"}${Math.abs(rounded).toFixed(1)}`;
 }
 
+const MIN_MINUTES = 1;
 const MAX_MINUTES = 720;
 
 /** Reads a length in minutes, such as a set or the time a record plays, with a point or a comma. */
@@ -24,7 +25,7 @@ export function parseMinutes(value: string): number | null {
   if (!/^\d+(\.\d+)?$/.test(normalized)) return null;
 
   const minutes = Number(normalized);
-  return minutes > 0 && minutes <= MAX_MINUTES ? minutes : null;
+  return minutes >= MIN_MINUTES && minutes <= MAX_MINUTES ? minutes : null;
 }
 
 /** Seconds as a clock to a tenth, "0:15.2" or "2:01.9", the way a CDJ shows time. */
