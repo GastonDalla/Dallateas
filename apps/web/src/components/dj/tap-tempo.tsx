@@ -7,6 +7,7 @@ import { useState, type KeyboardEvent } from "react";
 
 import { useHaptic } from "@/hooks/use-haptic";
 import { formatBpm } from "@/lib/format";
+import { Readout } from "@/components/dj/readout";
 
 type TapTempoProps = {
   /** Offers a button to keep the result, such as saving it to a track. */
@@ -41,8 +42,8 @@ export function TapTempo({ onConfirm, confirmLabel = "Usar este BPM", className 
         onKeyDown={handleKeyDown}
         className="flex h-44 w-full touch-manipulation select-none flex-col items-center justify-center gap-1 bg-primary text-primary-foreground transition-transform active:scale-[0.99]"
       >
-        <span className="tabular font-heading text-7xl font-bold leading-none" aria-live="polite">
-          {bpm === null ? "—" : formatBpm(bpm)}
+        <span aria-live="polite">
+          <Readout value={bpm === null ? "—" : formatBpm(bpm)} className="text-7xl leading-none" />
         </span>
         <span className="text-sm font-medium">
           {taps.length === 0 ? "Tocá al ritmo del bombo" : bpm === null ? "Seguí tocando" : `${taps.length} golpes`}

@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Barlow, Barlow_Condensed } from "next/font/google";
+import { Barlow, Barlow_Condensed, Doto } from "next/font/google";
 import { headers } from "next/headers";
 
 import { Analytics } from "@vercel/analytics/next";
@@ -25,6 +25,14 @@ const barlowCondensed = Barlow_Condensed({
   variable: "--font-barlow-condensed",
   subsets: ["latin"],
   weight: ["600", "700"],
+});
+
+/** Dot-matrix figures, like the screen of a mixer or a CDJ. Only for live readouts. */
+const doto = Doto({
+  variable: "--font-doto",
+  subsets: ["latin"],
+  axes: ["ROND"],
+  display: "swap",
 });
 
 export const viewport: Viewport = {
@@ -117,7 +125,7 @@ export default async function RootLayout({
           dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }}
         />
       </head>
-      <body className={`${barlow.variable} ${barlowCondensed.variable} bg-background font-sans antialiased`}>
+      <body className={`${barlow.variable} ${barlowCondensed.variable} ${doto.variable} bg-background font-sans antialiased`}>
         <Providers nonce={nonce}>
           <a
             href="#main-content"

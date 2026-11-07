@@ -6,6 +6,7 @@ import { detectBpm } from "@dallateas/dj/detect";
 import { Mic } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
+import { Readout } from "@/components/dj/readout";
 import { formatBpm } from "@/lib/format";
 
 const LISTEN_MS = 12_000;
@@ -109,7 +110,7 @@ export function MicBpm({ onConfirm, confirmLabel = "Usar este BPM", className }:
       <div className="flex h-44 flex-col items-center justify-center gap-1 bg-card text-center" aria-live="polite">
         {state.status === "done" ? (
           <>
-            <span className="tabular font-heading text-7xl font-bold leading-none">{formatBpm(state.bpm)}</span>
+            <Readout value={formatBpm(state.bpm)} className="text-7xl leading-none" />
             <span className="text-sm text-muted-foreground">¿Cierra con lo que escuchás?</span>
           </>
         ) : (
