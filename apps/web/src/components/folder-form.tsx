@@ -34,7 +34,7 @@ const schema = z.object({
 type FolderFormData = z.infer<typeof schema> & { password?: string | null };
 
 type FolderFormProps = {
-  initial?: Partial<FolderFormData>;
+  initial?: Partial<FolderFormData> & { hasPassword?: boolean };
   isSubmitting: boolean;
   onSubmit: (data: FolderFormData) => void;
   onCancel?: () => void;
@@ -58,7 +58,8 @@ export function FolderForm({
   const [visibility, setVisibility] = useState<"PUBLIC" | "ACCOUNT" | "PRIVATE">(
     initial?.visibility ?? "PRIVATE",
   );
-  const [password, setPassword] = useState(initial?.password ?? "");
+  const [password, setPassword] = useState("");
+  const [removePassword, setRemovePassword] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [nameError, setNameError] = useState("");
 
@@ -75,7 +76,7 @@ export function FolderForm({
       type,
       color: color || undefined,
       visibility,
-      password: visibility !== "PRIVATE" && password.trim() ? password.trim() : null,
+      password: removePassword ? null : password.trim() || undefined,
     });
   }
 
@@ -191,12 +192,12 @@ export function FolderForm({
             <Input
               id="folder-pass"
               type={showPassword ? "text" : "password"}
-              value={password ?? ""}
+              value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="Dejar vacio para acceso libre"
+              placeholder={initial?.hasPassword ? "Dejar vacío para mantener la actual" : "Dejar vacío para acceso libre"}
               maxLength={100}
               className="pr-10"
-              disabled={isSubmitting}
+              disabled={isSubmitting || removePassword}
             />
             <button
               type="button"
@@ -208,6 +209,17 @@ export function FolderForm({
               {showPassword ? <EyeOff className="h-4 w-4" aria-hidden="true" /> : <Eye className="h-4 w-4" aria-hidden="true" />}
             </button>
           </div>
+          {initial?.hasPassword && (
+            <label className="flex items-center gap-2 text-xs text-muted-foreground">
+              <input
+                type="checkbox"
+                checked={removePassword}
+                onChange={(e) => setRemovePassword(e.target.checked)}
+                disabled={isSubmitting}
+              />
+              Quitar la contraseña
+            </label>
+          )}
           <p className="text-[10px] text-muted-foreground">
             Si pones contrasena, solo quienes la tengan podran ver el contenido.
           </p>

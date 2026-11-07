@@ -80,7 +80,7 @@ export default function FolderDetail({ id }: { id: string }) {
       queryClient.invalidateQueries({ queryKey: trpc.folderCollaborators.queryOptions({ folderId: id }).queryKey });
       setInviteEmail("");
       setShowInvite(false);
-      toast.success("Colaborador invitado");
+      toast.success("Si esa cuenta existe, ya tiene acceso a la carpeta");
     },
     onError: (err) => toast.error(err.message),
   });
@@ -173,10 +173,7 @@ export default function FolderDetail({ id }: { id: string }) {
                   variant="outline"
                   size="icon-sm"
                   onClick={() => {
-                    const url = folder.password
-                      ? `${publicUrl}?pw=${encodeURIComponent(folder.password)}`
-                      : publicUrl;
-                    navigator.clipboard.writeText(url);
+                    navigator.clipboard.writeText(publicUrl);
                     toast.success("Link copiado");
                   }}
                   title="Copiar link"

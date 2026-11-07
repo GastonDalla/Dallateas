@@ -1,38 +1,33 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { ArrowLeft, Disc3, ListMusic, Lock } from "lucide-react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import { Button } from "@dallateas/ui/components/button";
 import { Input } from "@dallateas/ui/components/input";
 import { QrDownload } from "@/components/qr-download";
 import { VinylCard } from "@/components/vinyl-card";
-import { trpc } from "@/utils/trpc";
+import { queryClient, trpc } from "@/utils/trpc";
 
 export default function BateaDetail({ id }: { id: string }) {
-  const searchParams = useSearchParams();
-  const urlPassword = searchParams.get("pw") ?? undefined;
   const [password, setPassword] = useState("");
-  const [submittedPassword, setSubmittedPassword] = useState<string | undefined>(urlPassword);
 
-  useEffect(() => {
-    if (urlPassword && typeof window !== "undefined") {
-      const url = new URL(window.location.href);
-      url.searchParams.delete("pw");
-      window.history.replaceState({}, "", url.toString());
-    }
-  }, [urlPassword]);
-
-  const folderQuery = useQuery(
-    trpc.publicFolderDetail.queryOptions({
-      id,
-      password: submittedPassword,
-    }),
-  );
+  const folderQuery = useQuery(trpc.publicFolderDetail.queryOptions({ id }));
   const folder = folderQuery.data;
+
+  const unlock = useMutation({
+    ...trpc.folderUnlock.mutationOptions(),
+    onSuccess: () => {
+      setPassword("");
+      queryClient.invalidateQueries({ queryKey: trpc.publicFolderDetail.queryKey({ id }) });
+    },
+  });
+
+  const submitPassword = () => {
+    if (password.trim()) unlock.mutate({ id, password: password.trim() });
+  };
 
   if (folderQuery.isLoading) {
     return (
@@ -104,22 +99,18 @@ export default function BateaDetail({ id }: { id: string }) {
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Contrasena"
               onKeyDown={(e) => {
-                if (e.key === "Enter" && password.trim()) {
-                  setSubmittedPassword(password.trim());
-                }
+                if (e.key === "Enter") submitPassword();
               }}
             />
             <Button
               type="button"
-              disabled={!password.trim()}
-              onClick={() => setSubmittedPassword(password.trim())}
+              disabled={!password.trim() || unlock.isPending}
+              onClick={submitPassword}
             >
               Entrar
             </Button>
           </div>
-          {submittedPassword && (
-            <p className="text-xs text-red-500">Contrasena incorrecta</p>
-          )}
+          {unlock.error && <p className="text-xs text-destructive">{unlock.error.message}</p>}
         </div>
       ) : folder.vinyls.length === 0 ? (
         <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed border-border/60 py-16 text-center">

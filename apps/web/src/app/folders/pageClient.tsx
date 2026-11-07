@@ -180,6 +180,7 @@ export default function FoldersPageClient() {
                         type: folder.type,
                         color: folder.color ?? "",
                         visibility: folder.visibility,
+                        hasPassword: folder.hasPassword,
                       }}
                       isSubmitting={updateFolder.isPending}
                       onSubmit={(data) => updateFolder.mutate({ ...data, id: folder.id })}

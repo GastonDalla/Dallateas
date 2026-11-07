@@ -1,5 +1,8 @@
 import prisma from "@dallateas/db";
 import type { Metadata } from "next";
+import { after } from "next/server";
+
+import { getServerCaller } from "@/server/trpc";
 
 import BateaDetail from "./batea-detail";
 
@@ -8,7 +11,7 @@ type Props = { params: Promise<{ id: string }> };
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;
   const folder = await prisma.folder.findFirst({
-    where: { id, visibility: { not: "PRIVATE" } },
+    where: { id, visibility: "PUBLIC" },
     select: { name: true, description: true, user: { select: { name: true } } },
   });
 
@@ -37,5 +40,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function BateaPage({ params }: Props) {
   const { id } = await params;
+  const caller = await getServerCaller();
+  after(() => caller.folderRecordView({ id }).catch((error) => console.error("Folder view not recorded", error)));
+
   return <BateaDetail id={id} />;
 }
