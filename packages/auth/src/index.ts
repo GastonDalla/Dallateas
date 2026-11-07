@@ -123,13 +123,13 @@ export const auth = betterAuth({
       overrideDefaultEmailVerification: true,
       async sendVerificationOTP({ email, otp, type }) {
         const subjects: Record<string, string> = {
-          "sign-in": "Tu codigo de acceso — Dallateas",
-          "email-verification": "Verifica tu email — Dallateas",
-          "forget-password": "Recupera tu contrasena — Dallateas",
+          "sign-in": "Tu código de acceso a Dallateas",
+          "email-verification": "Verificá tu email en Dallateas",
+          "forget-password": "Recuperá tu contraseña de Dallateas",
         };
         await sendEmail(
           email,
-          subjects[type] ?? "Codigo de verificacion — Dallateas",
+          subjects[type] ?? "Tu código de verificación de Dallateas",
           otpEmailHtml(otp, type),
         );
       },
@@ -138,7 +138,7 @@ export const auth = betterAuth({
       sendMagicLink: async ({ email, url }) => {
         await sendEmail(
           email,
-          "Tu link de acceso — Dallateas",
+          "Tu link de acceso a Dallateas",
           magicLinkEmailHtml(url),
         );
       },

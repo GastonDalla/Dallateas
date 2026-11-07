@@ -1,250 +1,272 @@
 "use client";
 
 import { Button } from "@dallateas/ui/components/button";
-import { Input } from "@dallateas/ui/components/input";
-import { Label } from "@dallateas/ui/components/label";
-import { Eye, EyeOff, Loader2, Mail, Wand2 } from "lucide-react";
+import { cn } from "@dallateas/ui/lib/utils";
+import { Loader2 } from "lucide-react";
+import type { Route } from "next";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
 import { z } from "zod";
 
+import { AuthColumn } from "@/components/profile/auth-column";
+import { CodeField, Field, PRIMARY_ACTION, TEXT_LINK } from "@/components/profile/fields";
+import { authErrorMessage } from "@/components/profile/form-errors";
+import { PasswordField } from "@/components/profile/password-field";
 import { useHaptic } from "@/hooks/use-haptic";
 import { authClient } from "@/lib/auth-client";
 
-const schema = z.object({
-  email: z.string().min(1, "El email es requerido").email("Email invalido"),
-  password: z.string().min(8, "Minimo 8 caracteres"),
-});
+export type SignInMode = "password" | "code" | "magic";
 
-type Fields = z.infer<typeof schema>;
-type FieldErrors = Partial<Record<keyof Fields, string>>;
+const MODES: { value: SignInMode; label: string }[] = [
+  { value: "password", label: "Contraseña" },
+  { value: "code", label: "Código" },
+  { value: "magic", label: "Link por email" },
+];
 
-export default function SignInForm() {
+const SUBMIT_LABELS = {
+  password: { idle: "Ingresar", busy: "Ingresando" },
+  sendCode: { idle: "Enviar código", busy: "Enviando" },
+  code: { idle: "Ingresar", busy: "Ingresando" },
+  magic: { idle: "Enviar link", busy: "Enviando" },
+};
+
+const emailSchema = z.string().trim().min(1, "Ingresá tu email").email("Email inválido");
+const passwordSchema = z.string().min(8, "Mínimo 8 caracteres");
+
+function firstIssue(schema: z.ZodType, value: string) {
+  return schema.safeParse(value).error?.issues[0]?.message;
+}
+
+type SignInFormProps = {
+  initialMode?: SignInMode;
+  initialEmail?: string;
+  /** Set when an emailed link brought the visitor back here because it no longer works. */
+  linkFailed?: boolean;
+};
+
+export default function SignInForm({ initialMode = "password", initialEmail = "", linkFailed = false }: SignInFormProps) {
   const router = useRouter();
   const haptic = useHaptic();
-  const [mode, setMode] = useState<"password" | "magic">("password");
-  const [email, setEmail] = useState("");
+  const [mode, setMode] = useState(initialMode);
+  const [email, setEmail] = useState(initialEmail);
   const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-  const [errors, setErrors] = useState<FieldErrors>({});
-  const [touched, setTouched] = useState<Record<string, boolean>>({});
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [code, setCode] = useState("");
+  const [codeSent, setCodeSent] = useState(false);
   const [magicSent, setMagicSent] = useState(false);
+  const [touched, setTouched] = useState({ email: false, password: false });
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  function validate(overrides?: Partial<Fields>): boolean {
-    const data = { email, password, ...overrides };
-    const result = schema.safeParse(data);
-    if (result.success) {
-      setErrors({});
-      return true;
-    }
-    const next: FieldErrors = {};
-    for (const issue of result.error.issues) {
-      const key = issue.path[0] as keyof FieldErrors;
-      if (!next[key]) next[key] = issue.message;
-    }
-    setErrors(next);
-    return false;
+  const address = email.trim();
+  const emailError = touched.email ? firstIssue(emailSchema, email) : undefined;
+  const passwordError = touched.password ? firstIssue(passwordSchema, password) : undefined;
+
+  function enterApp() {
+    haptic.trigger("success");
+    toast.success("Sesión iniciada");
+    router.push("/dashboard");
+    // The shell lives in the root layout, which a client navigation does not render again.
+    router.refresh();
   }
 
-  function handleBlur(field: keyof Fields) {
-    setTouched((prev) => ({ ...prev, [field]: true }));
-    validate();
+  async function goToVerification() {
+    // Signing in does not send a code, and the one from the sign-up may have expired.
+    await authClient.emailOtp.sendVerificationOtp({ email: address, type: "email-verification" });
+    toast.info("Te mandamos un código para verificar tu email");
+    router.push(`/verify-email?email=${encodeURIComponent(address)}` as Route);
   }
 
-  async function handlePasswordLogin() {
-    setTouched({ email: true, password: true });
-    if (!validate()) return;
-
-    setIsSubmitting(true);
-    try {
-      await authClient.signIn.email(
-        { email: email.trim(), password },
-        {
-          onSuccess: (ctx) => {
-            haptic.trigger("success");
-            if (!ctx.data.user.emailVerified) {
-              router.push(`/verify-email?email=${encodeURIComponent(email.trim())}&from=login`);
-              toast.info("Verifica tu email para continuar");
-            } else {
-              router.push("/dashboard");
-              toast.success("Sesion iniciada");
-            }
-          },
-          onError: (error) => {
-            haptic.trigger("error");
-            const msg = error.error.message?.toLowerCase() ?? "";
-            if (msg.includes("email") && (msg.includes("verif") || msg.includes("not verified"))) {
-              router.push(`/verify-email?email=${encodeURIComponent(email.trim())}&from=login`);
-              toast.info("Verifica tu email para continuar");
-            } else {
-              toast.error(error.error.message || "Credenciales incorrectas");
-            }
-          },
-        },
-      );
-    } finally {
-      setIsSubmitting(false);
+  async function signInWithPassword() {
+    const { data, error } = await authClient.signIn.email({ email: address, password });
+    if (error?.code === "EMAIL_NOT_VERIFIED" || (data && !data.user.emailVerified)) {
+      await goToVerification();
+    } else if (error) {
+      haptic.trigger("error");
+      toast.error(authErrorMessage(error, "No pudimos iniciar sesión"));
+    } else {
+      enterApp();
     }
   }
 
-  async function handleMagicLink() {
-    if (!email.trim() || !z.string().email().safeParse(email).success) {
-      setTouched({ email: true });
-      setErrors({ email: "Email invalido" });
+  async function sendCode() {
+    const { error } = await authClient.emailOtp.sendVerificationOtp({ email: address, type: "sign-in" });
+    if (error) {
+      toast.error(authErrorMessage(error, "No pudimos enviar el código"));
       return;
     }
+    setCodeSent(true);
+    toast.success("Código enviado a tu email");
+  }
+
+  async function signInWithCode() {
+    const { error } = await authClient.signIn.emailOtp({ email: address, otp: code });
+    if (error) {
+      haptic.trigger("error");
+      toast.error(authErrorMessage(error, "No pudimos iniciar sesión"));
+    } else {
+      enterApp();
+    }
+  }
+
+  async function sendMagicLink() {
+    const { error } = await authClient.signIn.magicLink({
+      email: address,
+      callbackURL: "/dashboard",
+      errorCallbackURL: "/login?error=link",
+    });
+    if (error) {
+      toast.error(authErrorMessage(error, "No pudimos enviar el link"));
+      return;
+    }
+    setMagicSent(true);
+  }
+
+  async function run(action: () => Promise<void>) {
     setIsSubmitting(true);
     try {
-      const res = await authClient.signIn.magicLink({ email: email.trim() });
-      if (res.error) {
-        toast.error(res.error.message || "Error al enviar magic link");
-      } else {
-        setMagicSent(true);
-        toast.success("Link enviado a tu email");
-      }
+      await action();
     } catch {
-      toast.error("Error al enviar magic link");
+      toast.error("No pudimos conectarnos. Probá de nuevo");
     } finally {
       setIsSubmitting(false);
     }
   }
 
-  const emailErr = touched.email ? errors.email : undefined;
-  const passErr = touched.password ? errors.password : undefined;
-  const inputError = "border-red-500 focus-visible:ring-red-500";
+  function submit() {
+    setTouched({ email: true, password: mode === "password" });
+    if (firstIssue(emailSchema, email)) return;
+
+    if (mode === "password") {
+      if (!firstIssue(passwordSchema, password)) void run(signInWithPassword);
+    } else if (mode === "magic") {
+      void run(sendMagicLink);
+    } else if (!codeSent) {
+      void run(sendCode);
+    } else if (code.length === 6) {
+      void run(signInWithCode);
+    }
+  }
 
   if (magicSent) {
     return (
-      <div className="mx-auto mt-16 w-full max-w-md px-6 text-center">
-        <div className="mb-6 flex justify-center">
-          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
-            <Mail className="h-8 w-8 text-primary" />
-          </div>
-        </div>
-        <h1 className="font-heading mb-2 text-2xl font-bold">Revisa tu email</h1>
-        <p className="text-sm text-muted-foreground">
-          Enviamos un link de acceso a{" "}
-          <span className="font-medium text-foreground">{email}</span>.
-          Hace click en el link para ingresar.
-        </p>
-        <button
-          type="button"
-          onClick={() => setMagicSent(false)}
-          className="mt-6 text-sm text-muted-foreground hover:text-foreground hover:underline"
-        >
-          Usar otro metodo
+      <AuthColumn
+        title="Revisá tu email"
+        description={
+          <>
+            Mandamos un link de acceso a <span className="font-medium text-foreground">{address}</span>. Abrilo desde
+            este dispositivo para ingresar
+          </>
+        }
+      >
+        <button type="button" onClick={() => setMagicSent(false)} className={cn(TEXT_LINK, "min-h-11 text-sm md:min-h-0")}>
+          Usar otro método
         </button>
-      </div>
+      </AuthColumn>
     );
   }
 
-  return (
-    <div className="mx-auto mt-10 w-full max-w-md p-6">
-      <h1 className="font-heading mb-2 text-center text-2xl font-bold">Iniciar sesion</h1>
-      <p className="mb-6 text-center text-sm text-muted-foreground">
-        Ingresa a tu cuenta de Dallateas
-      </p>
+  const enteringCode = mode === "code" && codeSent;
+  const labels = SUBMIT_LABELS[mode === "code" && !codeSent ? "sendCode" : mode];
 
-      {/* Mode toggle */}
-      <div className="mb-6 flex gap-1 rounded-md bg-muted p-1">
-        <button
-          type="button"
-          onClick={() => setMode("password")}
-          className={`flex flex-1 items-center justify-center gap-1.5 rounded px-3 py-1.5 text-xs font-medium transition-colors ${mode === "password" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground"}`}
-        >
-          Contrasena
-        </button>
-        <button
-          type="button"
-          onClick={() => setMode("magic")}
-          className={`flex flex-1 items-center justify-center gap-1.5 rounded px-3 py-1.5 text-xs font-medium transition-colors ${mode === "magic" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground"}`}
-        >
-          <Wand2 className="h-3 w-3" /> Magic Link
-        </button>
+  return (
+    <AuthColumn
+      title="Iniciar sesión"
+      description="Ingresá a tu cuenta de Dallateas"
+      footer={
+        <>
+          ¿No tenés cuenta?{" "}
+          <Link href="/register" className={TEXT_LINK}>
+            Registrate
+          </Link>
+        </>
+      }
+    >
+      {linkFailed && (
+        <p role="alert" className="mb-6 text-sm text-destructive">
+          El link venció o ya se usó. Pedí uno nuevo
+        </p>
+      )}
+
+      <div role="group" aria-label="Cómo ingresar" className="mb-6 flex gap-6 border-b border-border">
+        {MODES.map(({ value, label }) => (
+          <button
+            key={value}
+            type="button"
+            aria-pressed={mode === value}
+            onClick={() => setMode(value)}
+            className={cn(
+              "-mb-px h-11 border-b-2 text-sm transition-colors md:h-9",
+              mode === value
+                ? "border-primary font-medium text-foreground"
+                : "border-transparent text-muted-foreground hover:text-foreground",
+            )}
+          >
+            {label}
+          </button>
+        ))}
       </div>
 
-      <div className="space-y-4">
-        <div className="space-y-1.5">
-          <Label htmlFor="email">Email</Label>
-          <Input
-            id="email"
-            type="email"
-            autoComplete="email"
-            placeholder="tu@email.com"
-            value={email}
-            onChange={(e) => {
-              setEmail(e.target.value);
-              if (touched.email) validate({ email: e.target.value });
-            }}
-            onBlur={() => handleBlur("email")}
-            className={emailErr ? inputError : ""}
-            disabled={isSubmitting}
-          />
-          {emailErr && <p className="text-xs text-red-500">{emailErr}</p>}
-        </div>
+      <form
+        noValidate
+        className="space-y-4"
+        onSubmit={(event) => {
+          event.preventDefault();
+          submit();
+        }}
+      >
+        <Field
+          id="email"
+          label="Email"
+          type="email"
+          autoComplete="email"
+          placeholder="tu@email.com"
+          value={email}
+          onChange={(event) => {
+            setEmail(event.target.value);
+            setCodeSent(false);
+          }}
+          onBlur={() => setTouched((current) => ({ ...current, email: true }))}
+          error={emailError}
+          disabled={isSubmitting}
+        />
 
         {mode === "password" && (
-          <>
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="password">Contrasena</Label>
-                <Link
-                  href="/forgot-password"
-                  className="text-xs text-muted-foreground hover:text-foreground hover:underline"
-                >
-                  Olvidaste tu contrasena?
-                </Link>
-              </div>
-              <div className="relative">
-                <Input
-                  id="password"
-                  type={showPassword ? "text" : "password"}
-                  autoComplete="current-password"
-                  placeholder="Minimo 8 caracteres"
-                  value={password}
-                  onChange={(e) => {
-                    setPassword(e.target.value);
-                    if (touched.password) validate({ password: e.target.value });
-                  }}
-                  onBlur={() => handleBlur("password")}
-                  className={`pr-10 ${passErr ? inputError : ""}`}
-                  disabled={isSubmitting}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  aria-label={showPassword ? "Ocultar contrasena" : "Mostrar contrasena"}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                  tabIndex={-1}
-                >
-                  {showPassword ? <EyeOff className="h-4 w-4" aria-hidden="true" /> : <Eye className="h-4 w-4" aria-hidden="true" />}
-                </button>
-              </div>
-              {passErr && <p className="text-xs text-red-500">{passErr}</p>}
-            </div>
-
-            <Button type="button" className="w-full" disabled={isSubmitting} onClick={handlePasswordLogin}>
-              {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Ingresando...</> : "Ingresar"}
-            </Button>
-          </>
+          <PasswordField
+            id="password"
+            label="Contraseña"
+            autoComplete="current-password"
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+            onBlur={() => setTouched((current) => ({ ...current, password: true }))}
+            error={passwordError}
+            disabled={isSubmitting}
+            labelAction={
+              <Link href="/forgot-password" className="text-[13px] text-muted-foreground hover:text-foreground hover:underline">
+                ¿Olvidaste tu contraseña?
+              </Link>
+            }
+          />
         )}
 
-        {mode === "magic" && (
-          <Button type="button" className="w-full" disabled={isSubmitting} onClick={handleMagicLink}>
-            {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Enviando...</> : "Enviar magic link"}
-          </Button>
-        )}
-      </div>
+        {enteringCode && <CodeField value={code} onChange={setCode} disabled={isSubmitting} autoFocus />}
 
-      <p className="mt-6 text-center text-sm text-muted-foreground">
-        No tenes cuenta?{" "}
-        <Link href="/register" className="font-medium text-foreground underline-offset-4 hover:underline">
-          Registrate
-        </Link>
-      </p>
-    </div>
+        <Button type="submit" className={PRIMARY_ACTION} disabled={isSubmitting || (enteringCode && code.length < 6)}>
+          {isSubmitting && <Loader2 aria-hidden="true" className="size-4 motion-safe:animate-spin" />}
+          {isSubmitting ? labels.busy : labels.idle}
+        </Button>
+
+        {enteringCode && (
+          <button
+            type="button"
+            onClick={() => void run(sendCode)}
+            disabled={isSubmitting}
+            className="min-h-11 text-sm text-muted-foreground hover:text-foreground hover:underline md:min-h-0"
+          >
+            Reenviar código
+          </button>
+        )}
+      </form>
+    </AuthColumn>
   );
 }
