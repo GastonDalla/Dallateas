@@ -8,6 +8,7 @@ import { z } from "zod";
 import { lookupTrackBpm } from "../bpm-lookup";
 import { protectedProcedure, router } from "../index";
 import { consumeRateLimit } from "../rate-limit";
+import { tempoChange } from "../track-tempo";
 import { bpmSource, camelotKey, cueNotes, recordId, trackBpm, trackEnergy } from "../schemas";
 
 const HOUR_MS = 60 * 60 * 1000;
@@ -21,7 +22,7 @@ const pitchRange = z.number().min(1).max(50).default(DEFAULT_PITCH_RANGE);
 async function requireOwnedTrack(trackId: string, userId: string) {
   const track = await prisma.vinylTrack.findFirst({
     where: { id: trackId, vinyl: { userId } },
-    select: { id: true, vinylId: true, bpm: true, camelotKey: true },
+    select: { id: true, vinylId: true, bpm: true, bpmSource: true, camelotKey: true },
   });
   if (!track) throw new TRPCError({ code: "NOT_FOUND", message: "Track no encontrado" });
   return track;
@@ -51,12 +52,12 @@ export const djRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       const { id, bpm, bpmSource: source, ...data } = input;
-      await requireOwnedTrack(id, ctx.session.user.id);
+      const stored = await requireOwnedTrack(id, ctx.session.user.id);
 
-      // A source only means something next to a tempo, and a tempo typed here is no longer a lookup.
-      const tempo = bpm === undefined ? {} : { bpm, bpmSource: bpm === null ? null : (source ?? "MANUAL") };
-
-      return prisma.vinylTrack.update({ where: { id }, data: { ...data, ...tempo } });
+      return prisma.vinylTrack.update({
+        where: { id },
+        data: { ...data, ...tempoChange({ bpm, bpmSource: source }, stored) },
+      });
     }),
 
   vinylLookupBpm: protectedProcedure.input(z.object({ id: recordId })).mutation(async ({ ctx, input }) => {
@@ -103,7 +104,8 @@ export const djRouter = router({
       }
     }
 
-    return { searched, found, unavailable };
+    // A record longer than one pass reports what is left, so callers can tell a partial run from a full one.
+    return { searched, found, unavailable, remaining: vinyl.tracks.length - searched };
   }),
 
   vinylsMissingBpm: protectedProcedure.query(async ({ ctx }) => {

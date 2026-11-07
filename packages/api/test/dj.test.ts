@@ -36,6 +36,7 @@ test("a title matches its own mix names but not a longer title", () => {
 test("an artist matches a collaboration but not a shared word", () => {
   expect(sameArtist("Robert Hood (2)", "Robert Hood")).toBe(true);
   expect(sameArtist("Robert Hood", "Robert Hood & Floorplan")).toBe(true);
+  expect(sameArtist("Plastikman", "Plastikman feat. Someone")).toBe(true);
   expect(sameArtist("Hood", "Robert Hood")).toBe(false);
   expect(sameArtist("The Orb", "Orbital")).toBe(false);
 });
@@ -134,7 +135,7 @@ describe.skipIf(!hasDatabase)("per-track BPM", () => {
 
     const result = await caller.vinylLookupBpm({ id: vinyl.id });
 
-    expect(result).toEqual({ searched: 1, found: 1, unavailable: false });
+    expect(result).toEqual({ searched: 1, found: 1, unavailable: false, remaining: 0 });
     const updated = await caller.vinylGet({ id: vinyl.id });
     expect(updated.tracks[0]).toMatchObject({ bpm: 134.3, bpmSource: "LOOKUP" });
     expect(updated.tracks[1]).toMatchObject({ bpm: 131, bpmSource: "TAP" });
@@ -155,7 +156,7 @@ describe.skipIf(!hasDatabase)("per-track BPM", () => {
       "/track/8": { bpm: 140 },
     });
 
-    expect(await caller.vinylLookupBpm({ id: vinyl.id })).toEqual({ searched: 2, found: 0, unavailable: false });
+    expect(await caller.vinylLookupBpm({ id: vinyl.id })).toEqual({ searched: 2, found: 0, unavailable: false, remaining: 0 });
     expect((await caller.vinylGet({ id: vinyl.id })).tracks.map((track) => track.bpm)).toEqual([null, null]);
   });
 
@@ -169,7 +170,7 @@ describe.skipIf(!hasDatabase)("per-track BPM", () => {
 
     const result = await callerFor({ id: owner.id }).vinylLookupBpm({ id: vinyl.id });
 
-    expect(result).toEqual({ searched: 1, found: 0, unavailable: true });
+    expect(result).toEqual({ searched: 1, found: 0, unavailable: true, remaining: 1 });
     expect(offline).toHaveBeenCalledTimes(1);
   });
 
@@ -229,31 +230,147 @@ describe.skipIf(!hasDatabase)("per-track BPM", () => {
     expect((await caller.trackStats()).approximateBpm).toBe(0);
   });
 
-  test("a source without a tempo is not stored", async () => {
+  test("a source with no tempo to describe is refused", async () => {
     const owner = await createUser();
     const caller = callerFor({ id: owner.id });
     const vinyl = await createVinyl(owner.id, [], { tracks: twoTracks });
     const { tracks } = await caller.vinylGet({ id: vinyl.id });
 
-    await caller.trackUpdate({ id: tracks[0]!.id, bpmSource: "LOOKUP" });
-
-    expect((await caller.vinylGet({ id: vinyl.id })).tracks[0]?.bpmSource).toBeNull();
+    await expectTrpcError(caller.trackUpdate({ id: tracks[0]!.id, bpmSource: "LOOKUP" }), "BAD_REQUEST");
   });
 
-  test("the tracklist sent when editing is the whole truth, so a cleared duration clears", async () => {
+  test("a tempo can be confirmed by changing only its source", async () => {
+    const owner = await createUser();
+    const caller = callerFor({ id: owner.id });
+    const vinyl = await createVinyl(owner.id, [], { tracks: twoTracks });
+    const { tracks } = await caller.vinylGet({ id: vinyl.id });
+    await caller.trackUpdate({ id: tracks[0]!.id, bpm: 128, bpmSource: "LOOKUP" });
+
+    await caller.trackUpdate({ id: tracks[0]!.id, bpmSource: "TAP" });
+
+    expect((await caller.vinylGet({ id: vinyl.id })).tracks[0]).toMatchObject({ bpm: 128, bpmSource: "TAP" });
+  });
+
+  test("resending the same tempo keeps where it came from", async () => {
+    const owner = await createUser();
+    const caller = callerFor({ id: owner.id });
+    const vinyl = await createVinyl(owner.id, [], { tracks: twoTracks });
+    const { tracks } = await caller.vinylGet({ id: vinyl.id });
+    await caller.trackUpdate({ id: tracks[0]!.id, bpm: 128, bpmSource: "LOOKUP" });
+
+    await caller.trackUpdate({ id: tracks[0]!.id, bpm: 128 });
+    await caller.vinylUpdate({
+      id: vinyl.id,
+      title: "Minus",
+      artist: "Robert Hood",
+      tracks: [{ id: tracks[0]!.id, side: "A1", position: 0, title: "Minus", bpm: 128 }],
+    });
+
+    expect((await caller.vinylGet({ id: vinyl.id })).tracks[0]).toMatchObject({ bpm: 128, bpmSource: "LOOKUP" });
+  });
+
+  test("editing a record keeps every field of a track that was not sent", async () => {
     const owner = await createUser();
     const caller = callerFor({ id: owner.id });
     const vinyl = await createVinyl(owner.id, [], { tracks: [twoTracks[0]] });
     const { tracks } = await caller.vinylGet({ id: vinyl.id });
+    await caller.trackUpdate({ id: tracks[0]!.id, bpm: 128, bpmSource: "TAP", camelotKey: "8A", energy: 4, cueNotes: "Cue" });
 
     await caller.vinylUpdate({
       id: vinyl.id,
       title: "Minus",
       artist: "Robert Hood",
-      tracks: [{ id: tracks[0]!.id, side: "A1", position: 0, title: "Minus" }],
+      tracks: [{ id: tracks[0]!.id, side: "A1", position: 0, title: "Minus (Edit)" }],
     });
 
-    expect((await caller.vinylGet({ id: vinyl.id })).tracks[0]?.duration).toBeNull();
+    expect((await caller.vinylGet({ id: vinyl.id })).tracks[0]).toMatchObject({
+      title: "Minus (Edit)",
+      duration: "6:30",
+      bpm: 128,
+      bpmSource: "TAP",
+      camelotKey: "8A",
+      energy: 4,
+      cueNotes: "Cue",
+    });
+  });
+
+  test("null clears a field of a track", async () => {
+    const owner = await createUser();
+    const caller = callerFor({ id: owner.id });
+    const vinyl = await createVinyl(owner.id, [], { tracks: [twoTracks[0]] });
+    const { tracks } = await caller.vinylGet({ id: vinyl.id });
+    await caller.trackUpdate({ id: tracks[0]!.id, bpm: 128, bpmSource: "TAP" });
+
+    await caller.vinylUpdate({
+      id: vinyl.id,
+      title: "Minus",
+      artist: "Robert Hood",
+      tracks: [{ id: tracks[0]!.id, side: "A1", position: 0, title: "Minus", duration: null, bpm: null }],
+    });
+
+    expect((await caller.vinylGet({ id: vinyl.id })).tracks[0]).toMatchObject({
+      duration: null,
+      bpm: null,
+      bpmSource: null,
+    });
+  });
+
+  test("a lookup prefers the exact version over another mix of the same title", async () => {
+    const owner = await createUser();
+    const caller = callerFor({ id: owner.id });
+    const vinyl = await createVinyl(owner.id, [], {
+      tracks: [{ side: "A1", position: 0, title: "Minus (Dub)" }],
+    });
+    stubDeezer({
+      "/search": {
+        data: [
+          { id: 7, title: "Minus (Original Mix)", artist: { name: "Robert Hood" } },
+          { id: 8, title: "Minus (Dub)", artist: { name: "Robert Hood" } },
+        ],
+      },
+      "/track/7": { bpm: 128 },
+      "/track/8": { bpm: 124 },
+    });
+
+    await caller.vinylLookupBpm({ id: vinyl.id });
+
+    expect((await caller.vinylGet({ id: vinyl.id })).tracks[0]?.bpm).toBe(124);
+  });
+
+  test("a track Deezer no longer has does not stop the rest of the record", async () => {
+    const owner = await createUser();
+    const caller = callerFor({ id: owner.id });
+    const vinyl = await createVinyl(owner.id, [], { tracks: twoTracks });
+    stubDeezer({
+      "/search": {
+        data: [
+          { id: 7, title: "Minus", artist: { name: "Robert Hood" } },
+          { id: 8, title: "Plus", artist: { name: "Robert Hood" } },
+        ],
+      },
+      "/track/7": { error: { code: 800, message: "no data" } },
+      "/track/8": { bpm: 130 },
+    });
+
+    expect(await caller.vinylLookupBpm({ id: vinyl.id })).toEqual({
+      searched: 2,
+      found: 1,
+      unavailable: false,
+      remaining: 0,
+    });
+  });
+
+  test("a quota error stops the run and says so", async () => {
+    const owner = await createUser();
+    const vinyl = await createVinyl(owner.id, [], { tracks: twoTracks });
+    stubDeezer({ "/search": { error: { code: 4, message: "Quota limit exceeded" } } });
+
+    expect(await callerFor({ id: owner.id }).vinylLookupBpm({ id: vinyl.id })).toEqual({
+      searched: 1,
+      found: 0,
+      unavailable: true,
+      remaining: 1,
+    });
   });
 
   test("compilations are not looked up by artist", async () => {
@@ -265,6 +382,7 @@ describe.skipIf(!hasDatabase)("per-track BPM", () => {
       searched: 2,
       found: 0,
       unavailable: false,
+      remaining: 0,
     });
   });
 

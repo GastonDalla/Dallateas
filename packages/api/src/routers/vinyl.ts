@@ -5,6 +5,7 @@ import { z } from "zod";
 import { protectedProcedure, router } from "../index";
 import { consumeRateLimit } from "../rate-limit";
 import { camelotKey, recordId, tagName, trackInput, vinylInput } from "../schemas";
+import { tempoChange } from "../track-tempo";
 
 const folderSummary = {
   select: { folder: { select: { id: true, name: true, type: true, color: true } } },
@@ -53,35 +54,39 @@ async function syncFolders(tx: Prisma.TransactionClient, vinylId: string, folder
 }
 
 type TrackInput = z.infer<typeof trackInput>;
+type BpmSource = NonNullable<TrackInput["bpmSource"]>;
 
-/** The tracklist sent is the whole truth, so anything left out is cleared. */
-function trackColumns({ side, position, title, duration, bpm, bpmSource, camelotKey: key, energy, cueNotes }: TrackInput) {
-  const tempo = bpm ?? null;
+const NO_TEMPO = { bpm: null, bpmSource: null };
+
+function trackColumns(track: TrackInput, stored: { bpm: number | null; bpmSource: BpmSource | null }) {
+  const { side, position, title, duration, bpm, bpmSource, camelotKey: key, energy, cueNotes } = track;
   return {
     side,
     position,
     title,
-    duration: duration ?? null,
-    bpm: tempo,
-    bpmSource: tempo === null ? null : (bpmSource ?? "MANUAL"),
-    camelotKey: key ?? null,
-    energy: energy ?? null,
-    cueNotes: cueNotes ?? null,
+    duration: duration === "" ? null : duration,
+    camelotKey: key,
+    energy,
+    cueNotes,
+    ...tempoChange({ bpm, bpmSource }, stored),
   };
 }
 
 /** Updates tracks in place, because sets point at them by id. */
 async function syncTracks(tx: Prisma.TransactionClient, vinylId: string, tracks: TrackInput[]) {
-  const current = await tx.vinylTrack.findMany({ where: { vinylId }, select: { id: true } });
-  const existing = new Set(current.map(({ id }) => id));
+  const current = await tx.vinylTrack.findMany({
+    where: { vinylId },
+    select: { id: true, bpm: true, bpmSource: true },
+  });
+  const existing = new Map(current.map((track) => [track.id, track]));
   const kept = tracks.flatMap(({ id }) => (id && existing.has(id) ? [id] : []));
 
   await tx.vinylTrack.deleteMany({ where: { vinylId, id: { notIn: kept } } });
 
   for (const track of tracks) {
-    const columns = trackColumns(track);
-    if (track.id && existing.has(track.id)) await tx.vinylTrack.update({ where: { id: track.id }, data: columns });
-    else await tx.vinylTrack.create({ data: { ...columns, vinylId } });
+    const stored = track.id ? existing.get(track.id) : undefined;
+    if (stored) await tx.vinylTrack.update({ where: { id: stored.id }, data: trackColumns(track, stored) });
+    else await tx.vinylTrack.create({ data: { ...trackColumns(track, NO_TEMPO), vinylId } });
   }
 }
 
@@ -238,7 +243,7 @@ export const vinylRouter = router({
         if (tagNames?.length) await attachTags(tx, vinyl.id, userId, tagNames);
         if (tracks?.length) {
           await tx.vinylTrack.createMany({
-            data: tracks.map((track) => ({ ...trackColumns(track), vinylId: vinyl.id })),
+            data: tracks.map((track) => ({ ...trackColumns(track, NO_TEMPO), vinylId: vinyl.id })),
           });
         }
         return vinyl;

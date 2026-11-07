@@ -100,11 +100,12 @@ export const vinylInput = z.object({
 
 export const trackInput = z.object({
   // Present on tracks that already exist, so editing a record keeps their id and set choices.
+  // On those, an omitted field keeps its value and null clears it.
   id: recordId.optional(),
   side: z.string().trim().min(1).max(10),
   position: z.number().int().min(0).max(1000),
   title: z.string().trim().min(1).max(500),
-  duration: z.string().trim().max(20).optional(),
+  duration: z.string().trim().max(20).nullable().optional(),
   bpm: trackBpm.nullable().optional(),
   bpmSource: bpmSource.nullable().optional(),
   camelotKey: camelotKey.nullable().optional(),

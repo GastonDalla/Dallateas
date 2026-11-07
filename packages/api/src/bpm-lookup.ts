@@ -1,9 +1,14 @@
 const DEEZER_API = "https://api.deezer.com";
 const REQUEST_TIMEOUT_MS = 6000;
+const QUOTA_EXCEEDED = 4;
 const UNKNOWN_ARTISTS = new Set(["various", "various artists", "unknown artist"]);
+const CREDIT_SEPARATOR = /\s*(?:&|,|\/|\+|\bfeat\.?|\bft\.?|\bvs\.?|\bx\b|\band\b)\s*/i;
 
-type DeezerSearch = { data?: { id: number; title: string; artist?: { name: string } }[]; error?: unknown };
-type DeezerTrack = { bpm?: number; error?: unknown };
+type DeezerError = { error?: { code?: number } };
+type DeezerSearch = DeezerError & { data?: { id: number; title: string; artist?: { name: string } }[] };
+type DeezerTrack = DeezerError & { bpm?: number };
+
+type DeezerResponse<T> = { outcome: "ok"; body: T } | { outcome: "missing" } | { outcome: "failed" };
 
 export type LookupResult = {
   bpm: number | null;
@@ -32,26 +37,27 @@ export function sameTitle(a: string, b: string) {
   return left.length > 0 && left === normalizeName(withoutMixName(b));
 }
 
-/** A collaboration names the artist in full, so one shared word is only a coincidence. */
-export function sameArtist(a: string, b: string) {
-  const left = normalizeName(a);
-  const right = normalizeName(b);
-  if (!left || !right) return false;
-  if (left === right) return true;
-
-  const [shorter, longer] = left.length <= right.length ? [left, right] : [right, left];
-  return shorter.includes(" ") && ` ${longer} `.includes(` ${shorter} `);
+function credits(name: string) {
+  return name.split(CREDIT_SEPARATOR).map(normalizeName).filter(Boolean);
 }
 
-async function deezer<T extends { error?: unknown }>(path: string): Promise<T | null> {
+/** A collaboration credits the artist in full, so one shared word is only a coincidence. */
+export function sameArtist(a: string, b: string) {
+  const other = new Set(credits(b));
+  return credits(a).some((credit) => other.has(credit));
+}
+
+async function deezer<T extends DeezerError>(path: string): Promise<DeezerResponse<T>> {
   try {
     const response = await fetch(`${DEEZER_API}${path}`, { signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
-    if (!response.ok) return null;
+    if (!response.ok) return { outcome: "failed" };
+
     const body = (await response.json()) as T;
-    // Deezer reports quota errors with a 200 status.
-    return body.error ? null : body;
+    // Deezer reports errors with a 200 status. Only a spent quota means the rest would fail too.
+    if (body.error) return { outcome: body.error.code === QUOTA_EXCEEDED ? "failed" : "missing" };
+    return { outcome: "ok", body };
   } catch {
-    return null;
+    return { outcome: "failed" };
   }
 }
 
@@ -65,15 +71,23 @@ export async function lookupTrackBpm(artist: string, title: string): Promise<Loo
 
   const query = encodeURIComponent(`${artist.replace(/\(\d+\)/g, "")} ${title}`);
   const search = await deezer<DeezerSearch>(`/search?q=${query}&limit=5`);
-  if (!search) return { bpm: null, unavailable: true };
+  if (search.outcome === "failed") return { bpm: null, unavailable: true };
+  if (search.outcome === "missing") return { bpm: null, unavailable: false };
 
-  const match = search.data?.find(
-    (result) => sameTitle(result.title, title) && result.artist && sameArtist(result.artist.name, artist),
+  const candidates = (search.body.data ?? []).filter(
+    (result) => result.artist && sameArtist(result.artist.name, artist),
   );
+  const exactTitle = normalizeName(title);
+  // A dub and an original share a title but rarely a tempo, so the exact version wins.
+  const match =
+    candidates.find((result) => normalizeName(result.title) === exactTitle) ??
+    candidates.find((result) => sameTitle(result.title, title));
   if (!match) return { bpm: null, unavailable: false };
 
   const track = await deezer<DeezerTrack>(`/track/${match.id}`);
-  if (!track) return { bpm: null, unavailable: true };
+  if (track.outcome === "failed") return { bpm: null, unavailable: true };
+  if (track.outcome === "missing") return { bpm: null, unavailable: false };
 
-  return { bpm: track.bpm && track.bpm > 0 ? Math.round(track.bpm * 10) / 10 : null, unavailable: false };
+  const { bpm } = track.body;
+  return { bpm: bpm && bpm > 0 ? Math.round(bpm * 10) / 10 : null, unavailable: false };
 }
