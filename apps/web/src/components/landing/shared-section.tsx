@@ -46,6 +46,8 @@ async function PublicCrates() {
 }
 
 export function SharedSection() {
+  const cratesUrl = new URL("/bateas", SITE_URL);
+
   return (
     <section
       aria-labelledby="shared-title"
@@ -58,7 +60,7 @@ export function SharedSection() {
               <div>
                 <dt className="text-sm text-muted-foreground">Link</dt>
                 <dd className="mt-1 truncate border border-border px-3 py-2.5 text-base">
-                  {new URL("/bateas", SITE_URL).host}/batea/…
+                  {cratesUrl.host}/batea/…
                 </dd>
               </div>
               <div>
@@ -68,7 +70,7 @@ export function SharedSection() {
                 </dd>
               </div>
             </dl>
-            <QrSticker url={new URL("/bateas", SITE_URL).toString()} title="Bateas" className="mx-auto w-full max-w-[14rem] rotate-2" />
+            <QrSticker url={cratesUrl.toString()} title="Bateas" className="mx-auto w-full max-w-[14rem] rotate-2" />
           </div>
           <div className="md:col-span-5">
             <h2 id="shared-title" className="font-heading text-[clamp(2.5rem,1.6rem+3vw,3.5rem)] leading-none font-bold text-balance uppercase">

@@ -5,7 +5,7 @@ import type { CSSProperties, ReactNode } from "react";
 import { BpmSticker } from "@/components/dj/bpm-sticker";
 
 import styles from "./landing.module.css";
-import { LookupScreen, MicScreen, TapScreen } from "./screens";
+import { LOOKUP_BPM, LookupScreen, MIC_BPM, MicScreen, TAP_BPM, TapScreen } from "./screens";
 
 type Sheet = {
   name: string;
@@ -23,7 +23,7 @@ const SHEETS: Sheet[] = [
   {
     name: "Tap",
     body: "Tocá al ritmo del bombo. Con cuatro golpes ya hay tempo, y un golpe fuera de tiempo no lo arruina.",
-    sticker: <BpmSticker tempo="124" className={BIG_STICKER} />,
+    sticker: <BpmSticker tempo={String(TAP_BPM)} className={BIG_STICKER} />,
     stickerNote: "Lleno: medido en tu disco",
     tone: cn(styles.paper, "bg-background text-foreground"),
     screen: <TapScreen />,
@@ -31,7 +31,7 @@ const SHEETS: Sheet[] = [
   {
     name: "Micrófono",
     body: "Acercá el teléfono al parlante y dejá sonar 12 segundos. Probado con 42 loops de tempo conocido: acertó 38, no contestó en 2 y erró 2.",
-    sticker: <BpmSticker tempo="126.5" className={BIG_STICKER} />,
+    sticker: <BpmSticker tempo={String(MIC_BPM)} className={BIG_STICKER} />,
     stickerNote: "Lleno: lo escuchó tu teléfono",
     tone: "bg-muted text-foreground",
     screen: <MicScreen />,
@@ -39,7 +39,7 @@ const SHEETS: Sheet[] = [
   {
     name: "Búsqueda",
     body: "Buscamos el corte en Deezer y traemos el BPM que tengan. Ese número no salió de tu disco, así que queda hueco hasta que lo midas.",
-    sticker: <BpmSticker tempo="128" approximate className={BIG_STICKER} />,
+    sticker: <BpmSticker tempo={String(LOOKUP_BPM)} approximate className={BIG_STICKER} />,
     stickerNote: "Hueco: aproximado, de una búsqueda",
     tone: cn(styles.paper, "bg-card text-foreground"),
     screen: <LookupScreen />,

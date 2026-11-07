@@ -68,6 +68,7 @@ export function CamelotDial({ source, mixes, className }: CamelotDialProps) {
         })}
         {sourceKey && (
           <>
+            {/* SVG text cannot hold the Readout component; a key has no point or minus for Doto to garble. */}
             <text x={CENTER} y={CENTER - 10} textAnchor="middle" dominantBaseline="central" className="readout fill-foreground text-[44px]">
               {sourceKey}
             </text>

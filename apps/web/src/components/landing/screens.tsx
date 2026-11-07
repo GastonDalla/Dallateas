@@ -2,8 +2,8 @@ import { cn } from "@dallateas/ui/lib/utils";
 import type { ReactNode } from "react";
 
 /**
- * The three ways to get a tempo, drawn as the screen each one would show. Everything is computed
- * from the numbers on the page, so the pictures cannot claim more than the copy does.
+ * The three ways to get a tempo, drawn as the screen each one would show. The tempos are the ones
+ * the sheets print, exported from here, so a picture cannot claim a number the copy does not.
  */
 
 const round = (value: number) => Math.round(value * 10) / 10;
@@ -22,10 +22,10 @@ function Frame({ title, meta, children, className }: { title: string; meta: stri
   );
 }
 
-const TAP_BPM = 124;
+export const TAP_BPM = 124;
 const TAP_BEATS = 8;
 const TAP_COLUMNS_PER_BEAT = 24;
-/** Five taps, the third a little late: the one the tap tempo drops. */
+/** Six taps, the third a little late. Both intervals around it are dropped by the tap tempo. */
 const TAPS = [1.01, 2.0, 3.3, 3.98, 5.01, 5.99];
 const OUTLIER = 2;
 
@@ -89,7 +89,7 @@ export function TapScreen({ className }: ScreenProps) {
                   x={round((beatX(TAPS[index - 1]!) + x) / 2)}
                   y="312"
                   textAnchor="middle"
-                  className={cn("tabular text-[15px]", intervals[index - 1]! > 560 || index === OUTLIER + 1 ? "fill-muted-foreground" : "fill-foreground")}
+                  className={cn("tabular text-[15px]", index === OUTLIER || index === OUTLIER + 1 ? "fill-muted-foreground" : "fill-foreground")}
                 >
                   {intervals[index - 1]} ms
                 </text>
@@ -105,7 +105,7 @@ export function TapScreen({ className }: ScreenProps) {
   );
 }
 
-const MIC_BPM = 126.5;
+export const MIC_BPM = 126.5;
 const MIC_SECONDS = 12;
 const TEMPO_AXIS = { low: 80, high: 180 };
 const PEAKS = [
@@ -181,8 +181,10 @@ export function MicScreen({ className }: ScreenProps) {
   );
 }
 
+export const LOOKUP_BPM = 128;
+
 const LOOKUP_RESULTS = [
-  { title: "Último subte", artist: "Mesa Dos", tempo: "≈128", note: "mismo corte", chosen: true },
+  { title: "Último subte", artist: "Mesa Dos", tempo: `≈${LOOKUP_BPM}`, note: "mismo corte", chosen: true },
   { title: "Último subte (Dub)", artist: "Mesa Dos", tempo: "≈127", note: "otra versión, no se usa", chosen: false },
   { title: "Subte", artist: "Otra banda", tempo: "≈122", note: "otro tema, no se usa", chosen: false },
 ];
