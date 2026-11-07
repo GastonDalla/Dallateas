@@ -1,11 +1,11 @@
 import { cn } from "@dallateas/ui/lib/utils";
-import Image from "next/image";
 import Link from "next/link";
 import type { CSSProperties, ReactNode } from "react";
 
 import { BpmSticker } from "@/components/dj/bpm-sticker";
 
 import styles from "./landing.module.css";
+import { LookupScreen, MicScreen, TapScreen } from "./screens";
 
 type Sheet = {
   name: string;
@@ -13,7 +13,8 @@ type Sheet = {
   sticker: ReactNode;
   stickerNote: string;
   tone: string;
-  image: { src: string; alt: string; width: number; height: number };
+  /** What the method shows on a screen while it works. */
+  screen: ReactNode;
 };
 
 const BIG_STICKER = "px-4 py-3 text-[56px] md:px-5 md:py-4 md:text-[5.5rem]";
@@ -25,12 +26,7 @@ const SHEETS: Sheet[] = [
     sticker: <BpmSticker tempo="124" className={BIG_STICKER} />,
     stickerNote: "Lleno: medido en tu disco",
     tone: cn(styles.paper, "bg-background text-foreground"),
-    image: {
-      src: "/images/landing/hands-in-the-bins.jpg",
-      alt: "Dos manos revisando una batea con separadores escritos a mano",
-      width: 1024,
-      height: 609,
-    },
+    screen: <TapScreen />,
   },
   {
     name: "Micrófono",
@@ -38,12 +34,7 @@ const SHEETS: Sheet[] = [
     sticker: <BpmSticker tempo="126.5" className={BIG_STICKER} />,
     stickerNote: "Lleno: lo escuchó tu teléfono",
     tone: "bg-muted text-foreground",
-    image: {
-      src: "/images/landing/sl-1200-mk2.jpg",
-      alt: "Bandeja Technics SL-1200 con un disco girando y el fader de pitch a la derecha",
-      width: 1600,
-      height: 1200,
-    },
+    screen: <MicScreen />,
   },
   {
     name: "Búsqueda",
@@ -51,12 +42,7 @@ const SHEETS: Sheet[] = [
     sticker: <BpmSticker tempo="128" approximate className={BIG_STICKER} />,
     stickerNote: "Hueco: aproximado, de una búsqueda",
     tone: cn(styles.paper, "bg-card text-foreground"),
-    image: {
-      src: "/images/landing/browsing-crates.jpg",
-      alt: "Una persona revisando discos en un cajón",
-      width: 1024,
-      height: 631,
-    },
+    screen: <LookupScreen />,
   },
 ];
 
@@ -96,15 +82,7 @@ export function TempoSheets() {
                 </div>
                 <p className="max-w-[40ch] text-lg text-pretty">{sheet.body}</p>
               </div>
-              <div className="relative aspect-[4/3] md:aspect-auto">
-                <Image
-                  src={sheet.image.src}
-                  alt={sheet.image.alt}
-                  fill
-                  sizes="(min-width: 768px) 50vw, 100vw"
-                  className="object-cover"
-                />
-              </div>
+              <div className="dark md:border-l md:border-border">{sheet.screen}</div>
             </div>
           </li>
         ))}

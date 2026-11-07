@@ -7,6 +7,7 @@ import { useState, type ReactNode } from "react";
 import { BpmSticker } from "@/components/dj/bpm-sticker";
 import { KeyTag } from "@/components/dj/key-tag";
 import { PitchRuler } from "@/components/dj/pitch-ruler";
+import { Readout } from "@/components/dj/readout";
 import { formatPitch } from "@/lib/format";
 
 import styles from "./landing.module.css";
@@ -65,8 +66,8 @@ export function PitchSleeve({ children }: { children: ReactNode }) {
             <label htmlFor="pitch-fader" className="text-base font-medium">
               Pitch
             </label>
-            <output htmlFor="pitch-fader" className="tabular font-heading text-[28px] leading-none font-bold">
-              {formatPitch(pitch)}
+            <output htmlFor="pitch-fader">
+              <Readout value={formatPitch(pitch)} className="text-[40px] leading-none" />
             </output>
           </div>
           <div className="relative mt-1">

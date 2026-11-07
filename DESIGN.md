@@ -36,7 +36,7 @@ Reading this as: a crate manager for vinyl DJs, a printed record-shop language o
 ## 4. Color tokens
 
 ```design-tokens
-fonts: Barlow, Barlow Condensed
+fonts: Barlow, Barlow Condensed, Doto
 colors: #F4F4F2, #EBEBE8, #FFFFFF, #161615, #5E5E59, #FF5B14, #FFE8DC, #A83600, #2F7D54, #8A5A0B, #C4312B, #D9480F, #121211, #1A1A18, #232321, #F2F1ED, #A3A29B, #FF6A1F, #3A2013, #FFC5A8, #FF9463, #5CC48F, #E0A94A, #F0776F
 radii: 0, 2px, 4px, 8px, 9999px
 ```
@@ -61,6 +61,7 @@ The fluo is 2.8:1 on sleeve paper, fine as a fill under dark ink but too weak as
 - Display and figures: Barlow Condensed 600 and 700. Blunt like a ticket or a shop sticker.
 - Text and interface: Barlow 400, 500, 600.
 - Every number that lines up uses `tabular-nums`.
+- Live readouts (a tempo being measured, the pitch, a beat time, a set ramp) use Doto with round dots, like a mixer or CDJ screen, through the `Readout` component at 28px or more. Its point is drawn as a cross, so `Readout` sets the point and the minus in Barlow. Never for prose, labels or stored data in lists.
 - App scale: 13 / 14 / 16 / 20 / 28. Landing display runs up to about 6rem, at most 2 lines.
 
 ## 6. Spacing and layout
@@ -86,6 +87,7 @@ The fluo is 2.8:1 on sleeve paper, fine as a fill under dark ink but too weak as
 ## 9. Imagery and content
 
 - Imagery: real covers first. Without one, the plain sleeve with its die-cut hole, never a glowing disc.
+- No stock or found photography. Where a picture is needed, draw the screen the product or the booth would show, computed from the numbers on the page: a waveform with its taps, the tempo curve the microphone finds, a lookup list, the Camelot wheel, a real QR.
 - Voice: a DJ talking to a DJ. Short, specific, numbers over adjectives. "Mezcla", "pitch", "batea", "corte". No hype, no exclamation marks, no trailing periods on short strings.
 - Never state a number nobody measured. "Sin BPM" is an honest answer.
 
@@ -102,6 +104,7 @@ The fluo is 2.8:1 on sleeve paper, fine as a fill under dark ink but too weak as
 
 - 2026-11-07: replaced the cream and brown palette with Playfair, which matched the slop catalog and said nothing about vinyl. The brand had no logo or documented palette to preserve.
 - 2026-11-07: dealt direction `page-is-the-object`. Type redrawn from Young Serif and Source Serif to Barlow Condensed and Barlow, because the product is mostly numbers in dense tables. Palette kept the dealt proportions with the subject's colours: black vinyl and fluo sticker.
+- 2026-11-07: the user asked for the found photographs (Openverse and Wikimedia, black and white) to go and for a more electronic feel. They became screens drawn in code from the page's own numbers, and Doto came in for live readouts.
 
 ## 12. References
 

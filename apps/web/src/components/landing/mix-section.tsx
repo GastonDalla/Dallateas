@@ -2,12 +2,12 @@ import { keyLabel, parseKey } from "@dallateas/dj/camelot";
 import { rankMixes } from "@dallateas/dj/mixing";
 import { DEFAULT_PITCH_RANGE } from "@dallateas/dj/tempo";
 import { cn } from "@dallateas/ui/lib/utils";
-import Image from "next/image";
 
 import { BpmSticker } from "@/components/dj/bpm-sticker";
 import { PitchRuler } from "@/components/dj/pitch-ruler";
 import { formatPitch } from "@/lib/format";
 
+import { CamelotDial } from "./camelot-dial";
 import { RELATION_COPY, SAMPLE_MIX_CANDIDATES, SAMPLE_MIX_SOURCE } from "./sample-record";
 
 function keyName(value: string | null) {
@@ -21,15 +21,11 @@ export function MixSection() {
   return (
     <section aria-labelledby="mix-title" className="relative bg-card px-4 py-16 md:px-8 md:py-24">
       <div className="mx-auto grid max-w-[75rem] items-center gap-10 md:grid-cols-2 md:gap-16">
-        <div className="relative aspect-square">
-          <Image
-            src="/images/landing/sl-1200-mk5-from-above.jpg"
-            alt="Bandeja Technics vista desde arriba, con el disco en el plato y el fader de pitch al costado"
-            fill
-            sizes="(min-width: 1280px) 584px, (min-width: 768px) 50vw, 100vw"
-            className="object-cover"
-          />
-        </div>
+        <CamelotDial
+          source={SAMPLE_MIX_SOURCE.key}
+          mixes={mixes.map(({ track, effectiveKey, relation }) => ({ printed: track.key, sounding: effectiveKey, relation }))}
+          className="order-last mx-auto w-full max-w-[34rem] md:order-none"
+        />
 
         <div>
           <h2 id="mix-title" className="font-heading text-[clamp(2.5rem,1.6rem+3vw,3.5rem)] leading-none font-bold text-balance uppercase">

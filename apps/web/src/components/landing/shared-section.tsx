@@ -1,12 +1,13 @@
 import { cn } from "@dallateas/ui/lib/utils";
-import Image from "next/image";
 import Link from "next/link";
 import { Suspense } from "react";
 
+import { SITE_URL } from "@/app/batea/seo";
 import { getServerCaller } from "@/server/trpc";
 
 import { CrateTile } from "./crate-tile";
 import styles from "./landing.module.css";
+import { QrSticker } from "./qr-sticker";
 
 const CRATES_ON_LANDING = 6;
 const CRATES_TO_FETCH = 12;
@@ -52,14 +53,22 @@ export function SharedSection() {
     >
       <div className="mx-auto max-w-[75rem]">
         <div className="grid items-end gap-8 md:grid-cols-12 md:gap-12">
-          <div className="relative aspect-[8/5] md:col-span-7">
-            <Image
-              src="/images/landing/record-shop-bins.jpg"
-              alt="Bateas de una disquería, con los discos parados en fila a lo largo de una pared"
-              fill
-              sizes="(min-width: 1280px) 700px, (min-width: 768px) 58vw, 100vw"
-              className="object-cover"
-            />
+          <div className="dark grid items-center gap-6 bg-background p-6 text-foreground sm:grid-cols-[minmax(0,1fr)_minmax(0,14rem)] sm:p-10 md:col-span-7">
+            <dl className="flex flex-col gap-5">
+              <div>
+                <dt className="text-sm text-muted-foreground">Link</dt>
+                <dd className="mt-1 truncate border border-border px-3 py-2.5 text-base">
+                  {new URL("/bateas", SITE_URL).host}/batea/…
+                </dd>
+              </div>
+              <div>
+                <dt className="text-sm text-muted-foreground">Contraseña</dt>
+                <dd aria-label="Contraseña oculta" className="mt-1 border border-border px-3 py-2.5 text-base tracking-[0.25em]">
+                  ••••••
+                </dd>
+              </div>
+            </dl>
+            <QrSticker url={new URL("/bateas", SITE_URL).toString()} title="Bateas" className="mx-auto w-full max-w-[14rem] rotate-2" />
           </div>
           <div className="md:col-span-5">
             <h2 id="shared-title" className="font-heading text-[clamp(2.5rem,1.6rem+3vw,3.5rem)] leading-none font-bold text-balance uppercase">
