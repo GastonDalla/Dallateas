@@ -1,4 +1,4 @@
-import { defaultShouldDehydrateQuery, QueryCache, QueryClient } from "@tanstack/react-query";
+import { QueryCache, QueryClient } from "@tanstack/react-query";
 import superjson from "superjson";
 
 type ErrorHandler = (error: Error) => void;
@@ -13,10 +13,7 @@ export function makeQueryClient(onError?: ErrorHandler) {
         retry: 1,
       },
       mutations: { retry: false },
-      dehydrate: {
-        serializeData: superjson.serialize,
-        shouldDehydrateQuery: (query) => defaultShouldDehydrateQuery(query) || query.state.status === "pending",
-      },
+      dehydrate: { serializeData: superjson.serialize },
       hydrate: { deserializeData: superjson.deserialize },
     },
     queryCache: new QueryCache({ onError }),

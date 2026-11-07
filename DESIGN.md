@@ -37,7 +37,7 @@ Reading this as: a crate manager for vinyl DJs, a printed record-shop language o
 
 ```design-tokens
 fonts: Barlow, Barlow Condensed
-colors: #F4F4F2, #FFFFFF, #161615, #5E5E59, #FF5B14, #FFE8DC, #A83600, #2F7D54, #8A5A0B, #C4312B, #D9480F, #121211, #1A1A18, #232321, #F2F1ED, #A3A29B, #FF6A1F, #3A2013, #FFC5A8, #FF9463, #5CC48F, #E0A94A, #F0776F
+colors: #F4F4F2, #EBEBE8, #FFFFFF, #161615, #5E5E59, #FF5B14, #FFE8DC, #A83600, #2F7D54, #8A5A0B, #C4312B, #D9480F, #121211, #1A1A18, #232321, #F2F1ED, #A3A29B, #FF6A1F, #3A2013, #FFC5A8, #FF9463, #5CC48F, #E0A94A, #F0776F
 radii: 0, 2px, 4px, 8px, 9999px
 ```
 

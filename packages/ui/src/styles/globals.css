@@ -143,9 +143,6 @@
     @apply font-sans;
     scroll-behavior: smooth;
   }
-  h1, h2, h3 {
-    font-family: var(--font-heading);
-  }
 }
 
 /* Fix animate-spin broken by tw-animate-css @property override */

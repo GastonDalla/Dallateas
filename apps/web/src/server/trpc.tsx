@@ -26,10 +26,13 @@ export const serverTrpc = createTRPCOptionsProxy({
   queryClient: getServerQueryClient,
 });
 
-/** Starts queries for the client components below, without blocking the render. */
-export function prefetch(...queries: { queryKey: readonly unknown[] }[]) {
+/**
+ * Loads what the client components below read, before they render. Waiting here means the
+ * server and the browser render the same data, which `useQuery` needs to hydrate cleanly.
+ */
+export async function prefetch(...queries: { queryKey: readonly unknown[] }[]) {
   const queryClient = getServerQueryClient();
-  for (const query of queries) void queryClient.prefetchQuery(query as FetchQueryOptions);
+  await Promise.all(queries.map((query) => queryClient.prefetchQuery(query as FetchQueryOptions)));
 }
 
 export function HydrateClient({ children }: { children: ReactNode }) {
