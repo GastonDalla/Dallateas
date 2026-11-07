@@ -60,6 +60,8 @@ export function CameraCapture({ onCapture, onClose }: CameraCaptureProps) {
     if (!video) return;
 
     const { videoWidth, videoHeight } = video;
+    // Switching cameras leaves a moment with no frame, and capturing then would save a blank cover.
+    if (videoWidth === 0 || videoHeight === 0) return;
     const scale = Math.min(1, MAX_COVER_SIZE / Math.max(videoWidth, videoHeight));
     const canvas = document.createElement("canvas");
     canvas.width = Math.round(videoWidth * scale);
@@ -86,7 +88,10 @@ export function CameraCapture({ onCapture, onClose }: CameraCaptureProps) {
             variant="ghost"
             size="icon"
             className="size-11 md:size-8"
-            onClick={() => setFacingMode((current) => (current === "environment" ? "user" : "environment"))}
+            onClick={() => {
+              setReady(false);
+              setFacingMode((current) => (current === "environment" ? "user" : "environment"));
+            }}
             aria-label="Cambiar de cámara"
           >
             <RotateCcw aria-hidden="true" />

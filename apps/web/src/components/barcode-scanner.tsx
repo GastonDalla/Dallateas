@@ -45,6 +45,7 @@ export function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps) {
     haptic.trigger("success");
     void stopScanner(scannerRef.current);
     onScan(code);
+    onClose();
   });
 
   useEffect(() => {
