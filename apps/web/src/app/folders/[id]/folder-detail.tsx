@@ -41,7 +41,7 @@ import { ExportPdf } from "@/components/export-pdf";
 import { QrDownload } from "@/components/qr-download";
 import { SortableItem } from "@/components/sortable-item";
 import { VinylCard } from "@/components/vinyl-card";
-import { queryClient, trpc } from "@/utils/trpc";
+import { getQueryClient, trpc } from "@/utils/trpc";
 
 const ROLES = [
   { value: "VIEWER", label: "Solo ver" },
@@ -69,7 +69,7 @@ export default function FolderDetail({ id }: { id: string }) {
   const reorderVinyls = useMutation({
     ...trpc.folderReorderVinyls.mutationOptions(),
     onError: () => {
-      queryClient.invalidateQueries({ queryKey: trpc.folderGet.queryOptions({ id }).queryKey });
+      getQueryClient().invalidateQueries({ queryKey: trpc.folderGet.queryOptions({ id }).queryKey });
       toast.error("Error al reordenar");
     },
   });
@@ -77,7 +77,7 @@ export default function FolderDetail({ id }: { id: string }) {
   const invite = useMutation({
     ...trpc.folderInvite.mutationOptions(),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: trpc.folderCollaborators.queryOptions({ folderId: id }).queryKey });
+      getQueryClient().invalidateQueries({ queryKey: trpc.folderCollaborators.queryOptions({ folderId: id }).queryKey });
       setInviteEmail("");
       setShowInvite(false);
       toast.success("Si esa cuenta existe, ya tiene acceso a la carpeta");
@@ -88,7 +88,7 @@ export default function FolderDetail({ id }: { id: string }) {
   const removeCollab = useMutation({
     ...trpc.folderRemoveCollaborator.mutationOptions(),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: trpc.folderCollaborators.queryOptions({ folderId: id }).queryKey });
+      getQueryClient().invalidateQueries({ queryKey: trpc.folderCollaborators.queryOptions({ folderId: id }).queryKey });
       toast.success("Colaborador eliminado");
     },
   });
@@ -96,7 +96,7 @@ export default function FolderDetail({ id }: { id: string }) {
   const updateRole = useMutation({
     ...trpc.folderUpdateCollaboratorRole.mutationOptions(),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: trpc.folderCollaborators.queryOptions({ folderId: id }).queryKey });
+      getQueryClient().invalidateQueries({ queryKey: trpc.folderCollaborators.queryOptions({ folderId: id }).queryKey });
     },
   });
 
@@ -113,7 +113,7 @@ export default function FolderDetail({ id }: { id: string }) {
     if (oldIndex === -1 || newIndex === -1) return;
     const newOrder = arrayMove(folder.vinyls, oldIndex, newIndex);
     haptic.trigger("medium");
-    queryClient.setQueryData(trpc.folderGet.queryOptions({ id }).queryKey, { ...folder, vinyls: newOrder });
+    getQueryClient().setQueryData(trpc.folderGet.queryOptions({ id }).queryKey, { ...folder, vinyls: newOrder });
     reorderVinyls.mutate({ folderId: id, vinylOrder: newOrder.map((v: any) => v.id) });
   }
 

@@ -22,16 +22,14 @@ export default function UserMenu() {
 
   if (!session) {
     return (
-      <Link href="/login">
-        <Button variant="outline" size="sm">
-          Ingresar
-        </Button>
-      </Link>
+      <Button variant="outline" size="sm" render={<Link href="/login" />} nativeButton={false}>
+        Ingresar
+      </Button>
     );
   }
 
   const isAdmin = session.user.role === "admin";
-  const isImpersonating = !!(session.session as any)?.impersonatedBy;
+  const isImpersonating = Boolean(session.session.impersonatedBy);
 
   return (
     <div className="flex items-center gap-2">
@@ -40,7 +38,8 @@ export default function UserMenu() {
           type="button"
           onClick={async () => {
             await authClient.admin.stopImpersonating();
-            window.location.href = "/admin";
+            // A full load, so nothing cached from the impersonated account stays in memory.
+            window.location.assign("/admin");
           }}
           className="rounded-md bg-yellow-500/10 px-2.5 py-1 text-[11px] font-medium text-yellow-700 transition-colors hover:bg-yellow-500/20 dark:text-yellow-400"
         >

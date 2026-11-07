@@ -11,7 +11,7 @@ import { toast } from "sonner";
 
 import { CustomSelect } from "@/components/custom-select";
 import { Pagination } from "@/components/pagination";
-import { queryClient, trpc } from "@/utils/trpc";
+import { getQueryClient, trpc } from "@/utils/trpc";
 
 type ParsedRow = Record<string, string>;
 type DiscogsRelease = {
@@ -72,7 +72,7 @@ export default function ImportPage() {
   const bulkCreate = useMutation({
     ...trpc.vinylBulkCreate.mutationOptions(),
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: trpc.vinylsList.queryOptions().queryKey });
+      getQueryClient().invalidateQueries({ queryKey: trpc.vinylsList.queryOptions().queryKey });
       toast.success(`Se importaron ${data.count} vinilos`);
     },
     onError: () => toast.error("Error al importar"),

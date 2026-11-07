@@ -4,7 +4,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@dallateas/ui/components/sonner";
 import { lazy, Suspense } from "react";
 
-import { queryClient } from "@/utils/trpc";
+import { getQueryClient } from "@/utils/trpc";
 
 import { AddVinylProvider } from "./add-vinyl-context";
 import { ThemeProvider } from "./theme-provider";
@@ -17,10 +17,12 @@ const ReactQueryDevtools = lazy(() =>
 );
 
 export default function Providers({ children, nonce }: { children: React.ReactNode; nonce?: string }) {
+  const queryClient = getQueryClient();
+
   return (
     <ThemeProvider
       attribute="class"
-      defaultTheme="light"
+      defaultTheme="system"
       enableSystem
       disableTransitionOnChange
       nonce={nonce}
@@ -36,7 +38,7 @@ export default function Providers({ children, nonce }: { children: React.ReactNo
           </Suspense>
         )}
       </QueryClientProvider>
-      <Toaster richColors />
+      <Toaster />
     </ThemeProvider>
   );
 }

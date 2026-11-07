@@ -1,4 +1,5 @@
 import { initTRPC, TRPCError } from "@trpc/server";
+import superjson from "superjson";
 import { ZodError } from "zod";
 
 import type { Context } from "./context";
@@ -7,6 +8,8 @@ import { consumeMemoryLimit } from "./rate-limit";
 const UNIQUE_VIOLATION = "P2002";
 
 export const t = initTRPC.context<Context>().create({
+  // Keeps dates as dates on both sides, including data prefetched on the server.
+  transformer: superjson,
   errorFormatter({ shape, error }) {
     if (error.code === "INTERNAL_SERVER_ERROR") {
       // Prisma and driver messages describe the schema, so they stay in the server logs.

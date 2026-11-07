@@ -9,7 +9,7 @@ import { Button } from "@dallateas/ui/components/button";
 import { Input } from "@dallateas/ui/components/input";
 import { QrDownload } from "@/components/qr-download";
 import { VinylCard } from "@/components/vinyl-card";
-import { queryClient, trpc } from "@/utils/trpc";
+import { getQueryClient, trpc } from "@/utils/trpc";
 
 export default function BateaDetail({ id }: { id: string }) {
   const [password, setPassword] = useState("");
@@ -21,7 +21,7 @@ export default function BateaDetail({ id }: { id: string }) {
     ...trpc.folderUnlock.mutationOptions(),
     onSuccess: () => {
       setPassword("");
-      queryClient.invalidateQueries({ queryKey: trpc.publicFolderDetail.queryKey({ id }) });
+      getQueryClient().invalidateQueries({ queryKey: trpc.publicFolderDetail.queryKey({ id }) });
     },
   });
 

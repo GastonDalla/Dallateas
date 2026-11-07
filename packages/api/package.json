@@ -13,13 +13,14 @@
     "check-types": "tsc --noEmit"
   },
   "dependencies": {
-    "@trpc/server": "catalog:",
     "@dallateas/auth": "workspace:*",
     "@dallateas/db": "workspace:*",
+    "@dallateas/dj": "workspace:*",
     "@dallateas/env": "workspace:*",
-    "zod": "catalog:",
+    "@trpc/server": "catalog:",
     "better-auth": "catalog:",
-    "@dallateas/dj": "workspace:*"
+    "superjson": "^2.2.6",
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@dallateas/config": "workspace:*",

@@ -44,6 +44,7 @@
         "react-dom": "catalog:",
         "server-only": "^0.0.1",
         "sonner": "catalog:",
+        "superjson": "^2.2.6",
         "web-haptics": "^0.0.6",
         "zod": "catalog:",
       },
@@ -72,6 +73,7 @@
         "@dallateas/env": "workspace:*",
         "@trpc/server": "catalog:",
         "better-auth": "catalog:",
+        "superjson": "^2.2.6",
         "zod": "catalog:",
       },
       "devDependencies": {

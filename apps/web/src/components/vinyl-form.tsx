@@ -11,7 +11,7 @@ import { CameraCapture } from "@/components/camera-capture";
 import { useDebounce } from "@/hooks/use-debounce";
 import { useHaptic } from "@/hooks/use-haptic";
 import { fetchReleaseDetail, searchReleases, type DiscogsSearchRelease } from "@/lib/discogs";
-import { queryClient, trpc } from "@/utils/trpc";
+import { getQueryClient, trpc } from "@/utils/trpc";
 
 type TrackEntry = {
   id?: string;
@@ -47,7 +47,7 @@ export function VinylForm({ id, onSaved }: VinylFormProps) {
     ...trpc.vinylCreate.mutationOptions(),
     onSuccess: () => {
       haptic.trigger("success");
-      queryClient.invalidateQueries({ queryKey: vinylsKey });
+      getQueryClient().invalidateQueries({ queryKey: vinylsKey });
       toast.success("Vinilo guardado");
       onSaved?.();
     },
@@ -58,8 +58,8 @@ export function VinylForm({ id, onSaved }: VinylFormProps) {
     ...trpc.vinylUpdate.mutationOptions(),
     onSuccess: () => {
       haptic.trigger("success");
-      queryClient.invalidateQueries({ queryKey: vinylsKey });
-      if (id) queryClient.invalidateQueries({ queryKey: trpc.vinylGet.queryOptions({ id }).queryKey });
+      getQueryClient().invalidateQueries({ queryKey: vinylsKey });
+      if (id) getQueryClient().invalidateQueries({ queryKey: trpc.vinylGet.queryOptions({ id }).queryKey });
       toast.success("Vinilo actualizado");
       onSaved?.();
     },

@@ -27,7 +27,7 @@ import { fetchReleaseDetail, type DiscogsVideo } from "@/lib/discogs";
 import { useAddVinyl } from "@/components/add-vinyl-context";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { ExportPdf } from "@/components/export-pdf";
-import { queryClient, trpc } from "@/utils/trpc";
+import { getQueryClient, trpc } from "@/utils/trpc";
 
 function buildSearchQuery(artist: string, title: string) {
   return encodeURIComponent(`${artist} ${title}`);
@@ -60,7 +60,7 @@ export default function VinylDetail({ id }: { id: string }) {
     ...trpc.vinylDelete.mutationOptions(),
     onSuccess: () => {
       haptic.trigger("success");
-      queryClient.invalidateQueries({ queryKey: trpc.vinylsList.queryOptions().queryKey });
+      getQueryClient().invalidateQueries({ queryKey: trpc.vinylsList.queryOptions().queryKey });
       toast.success("Vinilo eliminado");
       router.push("/dashboard");
     },

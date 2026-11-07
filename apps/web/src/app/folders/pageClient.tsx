@@ -35,7 +35,7 @@ import { useHaptic } from "@/hooks/use-haptic";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { FolderForm } from "@/components/folder-form";
 import { SortableHandleItem } from "@/components/sortable-item";
-import { queryClient, trpc } from "@/utils/trpc";
+import { getQueryClient, trpc } from "@/utils/trpc";
 
 const ROLE_LABELS: Record<string, string> = {
   VIEWER: "Solo ver",
@@ -59,7 +59,7 @@ export default function FoldersPageClient() {
   const createFolder = useMutation({
     ...trpc.folderCreate.mutationOptions(),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: foldersKey });
+      getQueryClient().invalidateQueries({ queryKey: foldersKey });
       setShowCreate(false);
       toast.success("Carpeta creada");
     },
@@ -69,7 +69,7 @@ export default function FoldersPageClient() {
   const updateFolder = useMutation({
     ...trpc.folderUpdate.mutationOptions(),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: foldersKey });
+      getQueryClient().invalidateQueries({ queryKey: foldersKey });
       setEditingId(null);
       toast.success("Carpeta actualizada");
     },
@@ -79,7 +79,7 @@ export default function FoldersPageClient() {
   const deleteFolder = useMutation({
     ...trpc.folderDelete.mutationOptions(),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: foldersKey });
+      getQueryClient().invalidateQueries({ queryKey: foldersKey });
       setDeletingId(null);
       toast.success("Carpeta eliminada");
     },
@@ -90,7 +90,7 @@ export default function FoldersPageClient() {
   const reorderFolders = useMutation({
     ...trpc.folderReorder.mutationOptions(),
     onError: () => {
-      queryClient.invalidateQueries({ queryKey: foldersKey });
+      getQueryClient().invalidateQueries({ queryKey: foldersKey });
       toast.error("Error al reordenar");
     },
   });
@@ -111,7 +111,7 @@ export default function FoldersPageClient() {
     const newOrder = arrayMove(folders, oldIndex, newIndex);
 
     haptic.trigger("medium");
-    queryClient.setQueryData(foldersKey, newOrder);
+    getQueryClient().setQueryData(foldersKey, newOrder);
 
     reorderFolders.mutate({
       folderOrder: newOrder.map((f) => f.id),

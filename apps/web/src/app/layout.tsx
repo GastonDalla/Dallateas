@@ -1,33 +1,40 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, Playfair_Display } from "next/font/google";
+import { Barlow, Barlow_Condensed } from "next/font/google";
 import { headers } from "next/headers";
 
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 
 import "../index.css";
-import Header from "@/components/header";
 import { BottomNav } from "@/components/bottom-nav";
+import { MobileBar } from "@/components/shell/mobile-bar";
+import { Sidebar } from "@/components/shell/sidebar";
+import { SiteHeader } from "@/components/shell/site-header";
 import Providers from "@/components/providers";
 import { serializeJsonLd } from "@/lib/json-ld";
+import { getSession } from "@/server/session";
 import { ServiceWorker } from "@/components/service-worker";
 
-const inter = Inter({
-  variable: "--font-sans",
+const barlow = Barlow({
+  variable: "--font-barlow",
   subsets: ["latin"],
+  weight: ["400", "500", "600"],
 });
 
-const playfair = Playfair_Display({
-  variable: "--font-heading",
+const barlowCondensed = Barlow_Condensed({
+  variable: "--font-barlow-condensed",
   subsets: ["latin"],
-  weight: ["400", "600", "700", "900"],
+  weight: ["600", "700"],
 });
 
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
-  themeColor: "#2c1810",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#f4f4f2" },
+    { media: "(prefers-color-scheme: dark)", color: "#121211" },
+  ],
 };
 
 const siteUrl = process.env.BETTER_AUTH_URL ?? "https://dallateas.com";
@@ -35,12 +42,12 @@ const siteUrl = process.env.BETTER_AUTH_URL ?? "https://dallateas.com";
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
-    default: "Dallateas — Organiza tu coleccion de vinilos",
+    default: "Dallateas — Organizá tu colección de vinilos",
     template: "%s | Dallateas",
   },
   description:
-    "Organiza tu coleccion de vinilos en bateas, arma tus sets y comparti tus carpetas con el mundo. Para DJs de vinilos.",
-  keywords: ["vinilos", "DJ", "coleccion", "bateas", "sets", "discogs", "vinyl", "crate digging"],
+    "BPM por track, tonalidad y pitch para mezclar en bandejas. Armá tus bateas y tus sets, y compartilos.",
+  keywords: ["vinilos", "DJ", "colección", "bateas", "BPM", "tonalidad", "pitch", "sets", "discogs", "vinyl", "crate digging"],
   authors: [{ name: "Dallateas" }],
   creator: "Dallateas",
   openGraph: {
@@ -48,14 +55,14 @@ export const metadata: Metadata = {
     locale: "es_AR",
     url: siteUrl,
     siteName: "Dallateas",
-    title: "Dallateas — Organiza tu coleccion de vinilos",
-    description: "Organiza tu coleccion de vinilos en bateas, arma tus sets y comparti tus carpetas con el mundo.",
+    title: "Dallateas — Organizá tu colección de vinilos",
+    description: "BPM por track, tonalidad y pitch para mezclar en bandejas. Armá tus bateas y tus sets, y compartilos.",
     images: [{ url: "/favicon/web-app-manifest-512x512.png", width: 512, height: 512, alt: "Dallateas" }],
   },
   twitter: {
     card: "summary",
-    title: "Dallateas — Organiza tu coleccion de vinilos",
-    description: "Organiza tu coleccion de vinilos en bateas, arma tus sets y comparti tus carpetas.",
+    title: "Dallateas — Organizá tu colección de vinilos",
+    description: "BPM por track, tonalidad y pitch para mezclar en bandejas.",
   },
   icons: {
     icon: [
@@ -80,7 +87,7 @@ const jsonLd = {
   "@context": "https://schema.org",
   "@type": "WebApplication",
   name: "Dallateas",
-  description: "Organiza tu coleccion de vinilos en bateas, arma tus sets y comparti tus carpetas con el mundo.",
+  description: "BPM por track, tonalidad y pitch para mezclar en bandejas. Armá tus bateas y tus sets, y compartilos.",
   url: siteUrl,
   applicationCategory: "MusicApplication",
   operatingSystem: "Web",
@@ -98,7 +105,9 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const nonce = (await headers()).get("x-nonce") ?? undefined;
+  const [requestHeaders, session] = await Promise.all([headers(), getSession()]);
+  const nonce = requestHeaders.get("x-nonce") ?? undefined;
+  const signedIn = Boolean(session?.user.emailVerified);
 
   return (
     <html lang="es-AR" suppressHydrationWarning>
@@ -108,16 +117,33 @@ export default async function RootLayout({
           dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }}
         />
       </head>
-      <body className={`${inter.variable} ${playfair.variable} bg-background antialiased`}>
+      <body className={`${barlow.variable} ${barlowCondensed.variable} bg-background font-sans antialiased`}>
         <Providers nonce={nonce}>
-          <a href="#main-content" className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded-md focus:bg-primary focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-primary-foreground focus:shadow-lg">
+          <a
+            href="#main-content"
+            className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded-md focus:bg-primary focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-primary-foreground"
+          >
             Saltar al contenido principal
           </a>
-          <div className="grid h-svh grid-rows-[auto_1fr] pt-[env(safe-area-inset-top)]">
-            <Header />
-            <main id="main-content" tabIndex={-1} className="overflow-y-auto outline-none">{children}</main>
-          </div>
-          <BottomNav />
+          {signedIn ? (
+            <div className="flex min-h-svh">
+              <Sidebar />
+              <div className="min-w-0 flex-1 pt-[env(safe-area-inset-top)]">
+                <MobileBar />
+                <main id="main-content" tabIndex={-1} className="pb-24 outline-none md:pb-0">
+                  {children}
+                </main>
+              </div>
+              <BottomNav />
+            </div>
+          ) : (
+            <div className="flex min-h-svh flex-col pt-[env(safe-area-inset-top)]">
+              <SiteHeader />
+              <main id="main-content" tabIndex={-1} className="flex-1 outline-none">
+                {children}
+              </main>
+            </div>
+          )}
         </Providers>
         <ServiceWorker />
         <Analytics />

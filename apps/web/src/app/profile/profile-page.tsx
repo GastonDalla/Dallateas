@@ -36,7 +36,7 @@ import { VinylPicker } from "@/components/vinyl-picker";
 import { useDebounce } from "@/hooks/use-debounce";
 import { useHaptic } from "@/hooks/use-haptic";
 import { authClient } from "@/lib/auth-client";
-import { queryClient, trpc } from "@/utils/trpc";
+import { getQueryClient, trpc } from "@/utils/trpc";
 
 const SOCIAL_PLATFORMS = [
   { value: "instagram", label: "Instagram" },
@@ -193,7 +193,7 @@ export default function ProfilePage() {
     ...trpc.djProfileUpdate.mutationOptions(),
     onSuccess: () => {
       haptic.trigger("success");
-      queryClient.invalidateQueries({ queryKey: trpc.djProfileGet.queryOptions().queryKey });
+      getQueryClient().invalidateQueries({ queryKey: trpc.djProfileGet.queryOptions().queryKey });
       initialRef.current = {
         slug, bio, location, genres: profileGenres, isPublic, showViewCount,
         websiteUrl, featuredVinylId, featuredMixUrl, featuredMixTitle,
@@ -213,7 +213,7 @@ export default function ProfilePage() {
     ...trpc.djGigCreate.mutationOptions(),
     onSuccess: () => {
       haptic.trigger("success");
-      queryClient.invalidateQueries({ queryKey: trpc.djProfileGet.queryOptions().queryKey });
+      getQueryClient().invalidateQueries({ queryKey: trpc.djProfileGet.queryOptions().queryKey });
       setShowGigForm(false);
       setGigName(""); setGigVenue(""); setGigCity(""); setGigDate(""); setGigTicketUrl("");
       toast.success("Evento agregado");
@@ -225,7 +225,7 @@ export default function ProfilePage() {
     ...trpc.djGigDelete.mutationOptions(),
     onSuccess: () => {
       haptic.trigger("success");
-      queryClient.invalidateQueries({ queryKey: trpc.djProfileGet.queryOptions().queryKey });
+      getQueryClient().invalidateQueries({ queryKey: trpc.djProfileGet.queryOptions().queryKey });
       toast.success("Evento eliminado");
     },
   });
@@ -283,7 +283,7 @@ export default function ProfilePage() {
       haptic.trigger("success");
       if (variables.type === "youtube") setYoutubeVideos(data);
       else setSpotifyTracks(data);
-      queryClient.invalidateQueries({ queryKey: profileKey });
+      getQueryClient().invalidateQueries({ queryKey: profileKey });
     },
     onError: (err: any) => { haptic.trigger("error"); toast.error(err.message); },
   });
@@ -294,7 +294,7 @@ export default function ProfilePage() {
       haptic.trigger("success");
       if (variables.type === "youtube") setYoutubeVideos(data);
       else setSpotifyTracks(data);
-      queryClient.invalidateQueries({ queryKey: profileKey });
+      getQueryClient().invalidateQueries({ queryKey: profileKey });
     },
   });
 

@@ -13,7 +13,7 @@ import { FilterSelect } from "@/components/filter-select";
 import { VinylCard } from "@/components/vinyl-card";
 import { useDebounce } from "@/hooks/use-debounce";
 import { useHaptic } from "@/hooks/use-haptic";
-import { queryClient, trpc } from "@/utils/trpc";
+import { getQueryClient, trpc } from "@/utils/trpc";
 
 export default function Dashboard() {
   const haptic = useHaptic();
@@ -60,8 +60,8 @@ export default function Dashboard() {
     ...trpc.vinylDelete.mutationOptions(),
     onSuccess: () => {
       haptic.trigger("success");
-      queryClient.invalidateQueries({ queryKey: vinylsKey });
-      queryClient.invalidateQueries({ queryKey: foldersKey });
+      getQueryClient().invalidateQueries({ queryKey: vinylsKey });
+      getQueryClient().invalidateQueries({ queryKey: foldersKey });
       setDeleteVinylId(null);
       toast.success("Vinilo eliminado");
     },
@@ -72,8 +72,8 @@ export default function Dashboard() {
     ...trpc.vinylUpdate.mutationOptions(),
     onSuccess: () => {
       haptic.trigger("success");
-      queryClient.invalidateQueries({ queryKey: vinylsKey });
-      queryClient.invalidateQueries({ queryKey: foldersKey });
+      getQueryClient().invalidateQueries({ queryKey: vinylsKey });
+      getQueryClient().invalidateQueries({ queryKey: foldersKey });
       setMoveVinylId(null);
       toast.success("Vinilo movido");
     },
