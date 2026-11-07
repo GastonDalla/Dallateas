@@ -1,5 +1,6 @@
 import { mergeRouters } from "../index";
 import { adminRouter } from "./admin";
+import { djRouter } from "./dj";
 import { folderRouter } from "./folder";
 import { libraryRouter } from "./library";
 import { profileRouter } from "./profile";
@@ -12,6 +13,7 @@ export const appRouter = mergeRouters(
   folderRouter,
   libraryRouter,
   profileRouter,
+  djRouter,
   adminRouter,
 );
 

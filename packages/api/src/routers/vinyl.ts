@@ -45,6 +45,22 @@ async function syncFolders(tx: Prisma.TransactionClient, vinylId: string, folder
   );
 }
 
+type TrackInput = z.infer<typeof trackInput>;
+
+/** Updates tracks in place, because sets point at them by id. */
+async function syncTracks(tx: Prisma.TransactionClient, vinylId: string, tracks: TrackInput[]) {
+  const current = await tx.vinylTrack.findMany({ where: { vinylId }, select: { id: true } });
+  const existing = new Set(current.map(({ id }) => id));
+  const kept = tracks.flatMap(({ id }) => (id && existing.has(id) ? [id] : []));
+
+  await tx.vinylTrack.deleteMany({ where: { vinylId, id: { notIn: kept } } });
+
+  for (const { id, ...track } of tracks) {
+    if (id && existing.has(id)) await tx.vinylTrack.update({ where: { id }, data: track });
+    else await tx.vinylTrack.create({ data: { ...track, vinylId } });
+  }
+}
+
 async function attachTags(tx: Prisma.TransactionClient, vinylId: string, userId: string, names: string[]) {
   for (const name of new Set(names)) {
     const tag = await tx.tag.upsert({
@@ -162,7 +178,9 @@ export const vinylRouter = router({
         if (folderIds?.length) await appendToFolders(tx, vinyl.id, [...new Set(folderIds)]);
         if (tagNames?.length) await attachTags(tx, vinyl.id, userId, tagNames);
         if (tracks?.length) {
-          await tx.vinylTrack.createMany({ data: tracks.map((track) => ({ ...track, vinylId: vinyl.id })) });
+          await tx.vinylTrack.createMany({
+            data: tracks.map(({ id: _ignored, ...track }) => ({ ...track, vinylId: vinyl.id })),
+          });
         }
         return vinyl;
       });
@@ -185,12 +203,7 @@ export const vinylRouter = router({
           await tx.vinylTag.deleteMany({ where: { vinylId: id } });
           await attachTags(tx, id, userId, tagNames);
         }
-        if (tracks) {
-          await tx.vinylTrack.deleteMany({ where: { vinylId: id } });
-          if (tracks.length > 0) {
-            await tx.vinylTrack.createMany({ data: tracks.map((track) => ({ ...track, vinylId: id })) });
-          }
-        }
+        if (tracks) await syncTracks(tx, id, tracks);
         return updated;
       });
     }),

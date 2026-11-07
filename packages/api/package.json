@@ -18,7 +18,8 @@
     "@dallateas/db": "workspace:*",
     "@dallateas/env": "workspace:*",
     "zod": "catalog:",
-    "better-auth": "catalog:"
+    "better-auth": "catalog:",
+    "@dallateas/dj": "workspace:*"
   },
   "devDependencies": {
     "@dallateas/config": "workspace:*",

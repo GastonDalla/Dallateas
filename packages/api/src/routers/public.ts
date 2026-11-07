@@ -61,8 +61,19 @@ const publicVinylSelect = {
   discogsId: true,
   coverUrl: true,
   notes: true,
+  rpm: true,
   tracks: {
-    select: { id: true, side: true, position: true, title: true, duration: true },
+    select: {
+      id: true,
+      side: true,
+      position: true,
+      title: true,
+      duration: true,
+      bpm: true,
+      bpmSource: true,
+      camelotKey: true,
+      energy: true,
+    },
     orderBy: { position: "asc" },
   },
 } satisfies Prisma.VinylSelect;
@@ -160,6 +171,11 @@ export const publicRouter = router({
                 year: true,
                 label: true,
                 bpm: true,
+                tracks: {
+                  select: { bpm: true, camelotKey: true },
+                  where: { bpm: { not: null } },
+                  orderBy: { position: "asc" },
+                },
               },
             },
           },

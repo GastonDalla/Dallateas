@@ -13,7 +13,18 @@ import { useHaptic } from "@/hooks/use-haptic";
 import { fetchReleaseDetail, searchReleases, type DiscogsSearchRelease } from "@/lib/discogs";
 import { queryClient, trpc } from "@/utils/trpc";
 
-type TrackEntry = { side: string; position: number; title: string; duration?: string };
+type TrackEntry = {
+  id?: string;
+  side: string;
+  position: number;
+  title: string;
+  duration?: string;
+  bpm?: number | null;
+  bpmSource?: "MANUAL" | "TAP" | "MIC" | "LOOKUP" | null;
+  camelotKey?: string | null;
+  energy?: number | null;
+  cueNotes?: string | null;
+};
 
 type VinylFormProps = {
   id?: string;
@@ -114,7 +125,7 @@ export function VinylForm({ id, onSaved }: VinylFormProps) {
     setCoverUrl(v.coverUrl ?? "");
     setFolderIds(v.folders.map((fv: any) => fv.folderId));
     setTagNames(v.tags?.map((vt: any) => vt.tag.name) ?? []);
-    setTracks(v.tracks?.map((t: any) => ({ side: t.side, position: t.position, title: t.title, duration: t.duration ?? "" })) ?? []);
+    setTracks(v.tracks.map((track) => ({ ...track, duration: track.duration ?? "" })));
     setPopulated(true);
   }, [vinylQuery.data, populated]);
 

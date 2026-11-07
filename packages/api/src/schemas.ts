@@ -1,3 +1,4 @@
+import { parseKey } from "@dallateas/dj/camelot";
 import { z } from "zod";
 
 /** Ids Prisma generates for our own models. */
@@ -52,6 +53,31 @@ export const dateString = z
   .min(1)
   .refine((value) => !Number.isNaN(Date.parse(value)), "Fecha inválida");
 
+export const recordCondition = z.enum([
+  "MINT",
+  "NEAR_MINT",
+  "VERY_GOOD_PLUS",
+  "VERY_GOOD",
+  "GOOD_PLUS",
+  "GOOD",
+  "FAIR",
+  "POOR",
+]);
+
+export const trackBpm = z.number().min(20).max(400);
+export const bpmSource = z.enum(["MANUAL", "TAP", "MIC", "LOOKUP"]);
+export const camelotKey = z
+  .string()
+  .trim()
+  .transform((value, context) => {
+    const key = parseKey(value);
+    if (key) return key;
+    context.addIssue({ code: "custom", message: "Tonalidad inválida. Probá con 8A o Am." });
+    return z.NEVER;
+  });
+export const trackEnergy = z.number().int().min(1).max(5);
+export const cueNotes = z.string().trim().max(500);
+
 export const vinylInput = z.object({
   title: z.string().trim().min(1).max(500),
   artist: z.string().trim().min(1).max(500),
@@ -66,13 +92,24 @@ export const vinylInput = z.object({
   notes: z.string().trim().max(5000).optional(),
   mixNotes: z.string().trim().max(5000).optional(),
   pricePaid: z.number().min(0).max(999_999).optional(),
+  rpm: z.union([z.literal(33), z.literal(45), z.literal(78)]).nullable().optional(),
+  mediaCondition: recordCondition.nullable().optional(),
+  sleeveCondition: recordCondition.nullable().optional(),
+  location: z.string().trim().max(200).optional(),
 });
 
 export const trackInput = z.object({
+  // Present on tracks that already exist, so editing a record keeps their id and set choices.
+  id: recordId.optional(),
   side: z.string().trim().min(1).max(10),
   position: z.number().int().min(0).max(1000),
   title: z.string().trim().min(1).max(500),
   duration: z.string().trim().max(20).optional(),
+  bpm: trackBpm.nullable().optional(),
+  bpmSource: bpmSource.nullable().optional(),
+  camelotKey: camelotKey.nullable().optional(),
+  energy: trackEnergy.nullable().optional(),
+  cueNotes: cueNotes.nullable().optional(),
 });
 
 export const folderInput = z.object({

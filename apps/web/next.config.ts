@@ -3,7 +3,14 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   typedRoutes: true,
   reactCompiler: true,
-  transpilePackages: ["@dallateas/api", "@dallateas/auth", "@dallateas/db", "@dallateas/env", "@dallateas/ui"],
+  transpilePackages: [
+    "@dallateas/api",
+    "@dallateas/auth",
+    "@dallateas/db",
+    "@dallateas/dj",
+    "@dallateas/env",
+    "@dallateas/ui",
+  ],
   serverExternalPackages: ["@prisma/adapter-pg", "pg"],
   images: {
     formats: ["image/avif", "image/webp"],

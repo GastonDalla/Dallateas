@@ -87,6 +87,14 @@ model Vinyl {
   notes     String?
   mixNotes  String?
   pricePaid Float?
+  // Speed the record is cut at: 33, 45 or 78
+  rpm             Int?
+  mediaCondition  RecordCondition?
+  sleeveCondition RecordCondition?
+  // Where it lives: shelf, crate or bag
+  location        String?
+  playCount       Int       @default(0)
+  lastPlayedAt    DateTime?
   folders       FolderVinyl[]
   tags          VinylTag[]
   tracks        VinylTrack[]
@@ -136,9 +144,40 @@ model VinylTrack {
   position Int
   title    String
   duration String?
-  vinyl    Vinyl  @relation(fields: [vinylId], references: [id], onDelete: Cascade)
+  // Decimal, because a record measured by ear or by the app is rarely a whole number
+  bpm        Float?
+  // Where the value came from, so a lookup is never mistaken for a measurement
+  bpmSource  BpmSource?
+  // Camelot notation, e.g. "8A"
+  camelotKey String?
+  // 1 to 5
+  energy     Int?
+  // Mix-in and mix-out reminders for this cut
+  cueNotes   String?
+  vinyl      Vinyl       @relation(fields: [vinylId], references: [id], onDelete: Cascade)
+  setEntries FolderVinyl[]
 
   @@index([vinylId])
+  @@index([bpm])
+}
+
+enum BpmSource {
+  MANUAL
+  TAP
+  MIC
+  LOOKUP
+}
+
+// Goldmine grades, the scale Discogs uses
+enum RecordCondition {
+  MINT
+  NEAR_MINT
+  VERY_GOOD_PLUS
+  VERY_GOOD
+  GOOD_PLUS
+  GOOD
+  FAIR
+  POOR
 }
 
 model Folder {
@@ -192,9 +231,12 @@ model FolderVinyl {
   folderId String
   vinylId  String
   position Int?
+  // The cut chosen for this set, since a record usually holds several
+  trackId  String?
 
-  folder Folder @relation(fields: [folderId], references: [id], onDelete: Cascade)
-  vinyl  Vinyl  @relation(fields: [vinylId], references: [id], onDelete: Cascade)
+  folder Folder      @relation(fields: [folderId], references: [id], onDelete: Cascade)
+  vinyl  Vinyl       @relation(fields: [vinylId], references: [id], onDelete: Cascade)
+  track  VinylTrack? @relation(fields: [trackId], references: [id], onDelete: SetNull)
 
   @@unique([folderId, vinylId])
   @@index([folderId])
