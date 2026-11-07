@@ -19,6 +19,6 @@ export function tempoChange({ bpm, bpmSource }: TempoInput, stored: StoredTempo)
   }
 
   if (bpm === null) return { bpm: null, bpmSource: null };
-  if (bpmSource) return { bpm, bpmSource };
+  if (bpmSource !== undefined) return { bpm, bpmSource };
   return { bpm, bpmSource: bpm === stored.bpm ? (stored.bpmSource ?? "MANUAL") : ("MANUAL" as const) };
 }

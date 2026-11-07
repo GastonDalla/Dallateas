@@ -33,12 +33,25 @@ test("a title matches its own mix names but not a longer title", () => {
   expect(sameTitle("Love", "Glove")).toBe(false);
 });
 
+test("a named version only matches itself", () => {
+  expect(sameTitle("Minus (Dub)", "Minus (Dub)")).toBe(true);
+  expect(sameTitle("Minus (Dub)", "Minus (Original Mix)")).toBe(false);
+  expect(sameTitle("Minus (Part 1)", "Minus (Part 2)")).toBe(false);
+});
+
 test("an artist matches a collaboration but not a shared word", () => {
   expect(sameArtist("Robert Hood (2)", "Robert Hood")).toBe(true);
   expect(sameArtist("Robert Hood", "Robert Hood & Floorplan")).toBe(true);
   expect(sameArtist("Plastikman", "Plastikman feat. Someone")).toBe(true);
   expect(sameArtist("Hood", "Robert Hood")).toBe(false);
   expect(sameArtist("The Orb", "Orbital")).toBe(false);
+});
+
+test("words inside a name are not credit separators", () => {
+  expect(sameArtist("X", "X")).toBe(true);
+  expect(sameArtist("Featherstone", "Featherstone")).toBe(true);
+  expect(sameArtist("Sand and Stone", "Sand and Stone")).toBe(true);
+  expect(sameArtist("Xavier", "Avier")).toBe(false);
 });
 
 describe.skipIf(!hasDatabase)("per-track BPM", () => {
@@ -358,6 +371,26 @@ describe.skipIf(!hasDatabase)("per-track BPM", () => {
       unavailable: false,
       remaining: 0,
     });
+  });
+
+  test("a busy source is a failure, not an answer that there is no tempo", async () => {
+    const owner = await createUser();
+    const vinyl = await createVinyl(owner.id, [], { tracks: twoTracks });
+    stubDeezer({ "/search": { error: { code: 700, message: "Service busy" } } });
+
+    expect(await callerFor({ id: owner.id }).vinylLookupBpm({ id: vinyl.id })).toMatchObject({ unavailable: true });
+  });
+
+  test("a source can be cleared explicitly along with a tempo", async () => {
+    const owner = await createUser();
+    const caller = callerFor({ id: owner.id });
+    const vinyl = await createVinyl(owner.id, [], { tracks: twoTracks });
+    const { tracks } = await caller.vinylGet({ id: vinyl.id });
+    await caller.trackUpdate({ id: tracks[0]!.id, bpm: 128, bpmSource: "LOOKUP" });
+
+    await caller.trackUpdate({ id: tracks[0]!.id, bpm: 128, bpmSource: null });
+
+    expect((await caller.vinylGet({ id: vinyl.id })).tracks[0]).toMatchObject({ bpm: 128, bpmSource: null });
   });
 
   test("a quota error stops the run and says so", async () => {

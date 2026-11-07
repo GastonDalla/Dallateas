@@ -1,8 +1,8 @@
 const DEEZER_API = "https://api.deezer.com";
 const REQUEST_TIMEOUT_MS = 6000;
-const QUOTA_EXCEEDED = 4;
+const NO_DATA = 800;
 const UNKNOWN_ARTISTS = new Set(["various", "various artists", "unknown artist"]);
-const CREDIT_SEPARATOR = /\s*(?:&|,|\/|\+|\bfeat\.?|\bft\.?|\bvs\.?|\bx\b|\band\b)\s*/i;
+const CREDIT_SEPARATOR = /\s*[&,/+]\s*|\s+(?:feat\.?|ft\.?|vs\.?|x|and)\s+/i;
 
 type DeezerError = { error?: { code?: number } };
 type DeezerSearch = DeezerError & { data?: { id: number; title: string; artist?: { name: string } }[] };
@@ -31,14 +31,24 @@ function withoutMixName(value: string) {
   return value.replace(/[([].*?[)\]]/g, " ").replace(/\s-\s.*$/, " ");
 }
 
-/** "Minus" and "Minus (Original Mix)" are the same cut. "Plus" and "Plus One" are not. */
-export function sameTitle(a: string, b: string) {
-  const left = normalizeName(withoutMixName(a));
-  return left.length > 0 && left === normalizeName(withoutMixName(b));
+/**
+ * "Minus" is also Deezer's "Minus (Original Mix)", but "Minus (Dub)" is only itself:
+ * a record that names its version must not take another version's tempo.
+ */
+export function sameTitle(ours: string, theirs: string) {
+  const title = normalizeName(ours);
+  if (!title) return false;
+  if (title === normalizeName(theirs)) return true;
+  return withoutMixName(ours).trim() === ours.trim() && title === normalizeName(withoutMixName(theirs));
 }
 
 function credits(name: string) {
-  return name.split(CREDIT_SEPARATOR).map(normalizeName).filter(Boolean);
+  return name
+    .replace(/\(\d+\)/g, " ")
+    .trim()
+    .split(CREDIT_SEPARATOR)
+    .map(normalizeName)
+    .filter(Boolean);
 }
 
 /** A collaboration credits the artist in full, so one shared word is only a coincidence. */
@@ -53,8 +63,8 @@ async function deezer<T extends DeezerError>(path: string): Promise<DeezerRespon
     if (!response.ok) return { outcome: "failed" };
 
     const body = (await response.json()) as T;
-    // Deezer reports errors with a 200 status. Only a spent quota means the rest would fail too.
-    if (body.error) return { outcome: body.error.code === QUOTA_EXCEEDED ? "failed" : "missing" };
+    // Deezer reports errors with a 200 status. Only "no data" is an answer; quota and busy are failures.
+    if (body.error) return { outcome: body.error.code === NO_DATA ? "missing" : "failed" };
     return { outcome: "ok", body };
   } catch {
     return { outcome: "failed" };
