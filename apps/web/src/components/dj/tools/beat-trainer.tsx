@@ -141,8 +141,11 @@ export function BeatTrainer() {
       await engine.start(roundRef.current.lateBeats);
       setRunning(true);
     } catch {
+      // Close whatever audio was opened before the failure, so a retry starts clean.
+      const failedEngine = engineRef.current;
       engineRef.current = null;
       setFailed(true);
+      await failedEngine?.stop().catch(() => undefined);
     }
   }
 
