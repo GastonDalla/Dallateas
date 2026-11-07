@@ -54,6 +54,22 @@ async function syncFolders(tx: Prisma.TransactionClient, vinylId: string, folder
 
 type TrackInput = z.infer<typeof trackInput>;
 
+/** The tracklist sent is the whole truth, so anything left out is cleared. */
+function trackColumns({ side, position, title, duration, bpm, bpmSource, camelotKey: key, energy, cueNotes }: TrackInput) {
+  const tempo = bpm ?? null;
+  return {
+    side,
+    position,
+    title,
+    duration: duration ?? null,
+    bpm: tempo,
+    bpmSource: tempo === null ? null : (bpmSource ?? "MANUAL"),
+    camelotKey: key ?? null,
+    energy: energy ?? null,
+    cueNotes: cueNotes ?? null,
+  };
+}
+
 /** Updates tracks in place, because sets point at them by id. */
 async function syncTracks(tx: Prisma.TransactionClient, vinylId: string, tracks: TrackInput[]) {
   const current = await tx.vinylTrack.findMany({ where: { vinylId }, select: { id: true } });
@@ -62,9 +78,10 @@ async function syncTracks(tx: Prisma.TransactionClient, vinylId: string, tracks:
 
   await tx.vinylTrack.deleteMany({ where: { vinylId, id: { notIn: kept } } });
 
-  for (const { id, ...track } of tracks) {
-    if (id && existing.has(id)) await tx.vinylTrack.update({ where: { id }, data: track });
-    else await tx.vinylTrack.create({ data: { ...track, vinylId } });
+  for (const track of tracks) {
+    const columns = trackColumns(track);
+    if (track.id && existing.has(track.id)) await tx.vinylTrack.update({ where: { id: track.id }, data: columns });
+    else await tx.vinylTrack.create({ data: { ...columns, vinylId } });
   }
 }
 
@@ -221,7 +238,7 @@ export const vinylRouter = router({
         if (tagNames?.length) await attachTags(tx, vinyl.id, userId, tagNames);
         if (tracks?.length) {
           await tx.vinylTrack.createMany({
-            data: tracks.map(({ id: _ignored, ...track }) => ({ ...track, vinylId: vinyl.id })),
+            data: tracks.map((track) => ({ ...trackColumns(track), vinylId: vinyl.id })),
           });
         }
         return vinyl;

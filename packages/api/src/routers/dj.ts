@@ -11,7 +11,9 @@ import { consumeRateLimit } from "../rate-limit";
 import { bpmSource, camelotKey, cueNotes, recordId, trackBpm, trackEnergy } from "../schemas";
 
 const HOUR_MS = 60 * 60 * 1000;
-const LOOKUPS_PER_HOUR = 300;
+const TRACK_LOOKUPS_PER_HOUR = 600;
+const MAX_TRACKS_PER_LOOKUP = 30;
+const LOOKUP_BUDGET_MS = 20_000;
 const MIX_RESULTS = 30;
 
 const pitchRange = z.number().min(1).max(50).default(DEFAULT_PITCH_RANGE);
@@ -48,12 +50,13 @@ export const djRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const { id, ...data } = input;
+      const { id, bpm, bpmSource: source, ...data } = input;
       await requireOwnedTrack(id, ctx.session.user.id);
-      return prisma.vinylTrack.update({
-        where: { id },
-        data: { ...data, ...(data.bpm === null ? { bpmSource: null } : {}) },
-      });
+
+      // A source only means something next to a tempo, and a tempo typed here is no longer a lookup.
+      const tempo = bpm === undefined ? {} : { bpm, bpmSource: bpm === null ? null : (source ?? "MANUAL") };
+
+      return prisma.vinylTrack.update({ where: { id }, data: { ...data, ...tempo } });
     }),
 
   vinylLookupBpm: protectedProcedure.input(z.object({ id: recordId })).mutation(async ({ ctx, input }) => {
@@ -64,22 +67,43 @@ export const djRouter = router({
     });
     if (!vinyl) throw new TRPCError({ code: "NOT_FOUND", message: "Vinilo no encontrado" });
 
-    const allowed = await consumeRateLimit(`bpm-lookup:${userId}`, { limit: LOOKUPS_PER_HOUR, windowMs: HOUR_MS });
-    if (!allowed) {
-      throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "Demasiadas búsquedas. Probá de nuevo en un rato." });
-    }
-
+    let searched = 0;
     let found = 0;
-    // One at a time: Deezer limits requests per IP, and a record rarely holds more than a few cuts.
-    for (const track of vinyl.tracks) {
-      const bpm = await lookupTrackBpm(vinyl.artist, track.title);
-      if (bpm !== null) {
-        await prisma.vinylTrack.update({ where: { id: track.id }, data: { bpm, bpmSource: "LOOKUP" } });
-        found += 1;
+    let unavailable = false;
+    const deadline = Date.now() + LOOKUP_BUDGET_MS;
+
+    // One at a time: Deezer limits requests per address.
+    for (const track of vinyl.tracks.slice(0, MAX_TRACKS_PER_LOOKUP)) {
+      if (Date.now() > deadline) break;
+
+      const allowed = await consumeRateLimit(`bpm-lookup:${userId}`, {
+        limit: TRACK_LOOKUPS_PER_HOUR,
+        windowMs: HOUR_MS,
+      });
+      if (!allowed) {
+        if (searched > 0) break;
+        throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "Demasiadas búsquedas. Probá de nuevo en un rato." });
+      }
+
+      searched += 1;
+      const result = await lookupTrackBpm(vinyl.artist, track.title);
+
+      if (result.unavailable) {
+        unavailable = true;
+        break;
+      }
+
+      if (result.bpm !== null) {
+        // Only an empty track: the DJ may have measured this one while the lookup was running.
+        const { count } = await prisma.vinylTrack.updateMany({
+          where: { id: track.id, bpm: null },
+          data: { bpm: result.bpm, bpmSource: "LOOKUP" },
+        });
+        found += count;
       }
     }
 
-    return { searched: vinyl.tracks.length, found };
+    return { searched, found, unavailable };
   }),
 
   vinylsMissingBpm: protectedProcedure.query(async ({ ctx }) => {
@@ -177,10 +201,11 @@ export const djRouter = router({
         if (!owned) throw new TRPCError({ code: "NOT_FOUND", message: "Track no encontrado" });
       }
 
-      await prisma.folderVinyl.updateMany({
+      const { count } = await prisma.folderVinyl.updateMany({
         where: { folderId: input.folderId, vinylId: input.vinylId },
         data: { trackId: input.trackId },
       });
+      if (count === 0) throw new TRPCError({ code: "NOT_FOUND", message: "Ese disco ya no está en el set" });
       return { success: true };
     }),
 
@@ -212,7 +237,7 @@ export const djRouter = router({
     return {
       totalTracks: tracks.length,
       tracksWithBpm: bpms.length,
-      approximateBpm: tracks.filter(({ bpmSource: source }) => source === "LOOKUP").length,
+      approximateBpm: tracks.filter(({ bpm, bpmSource: source }) => bpm !== null && source === "LOOKUP").length,
       averageBpm: bpms.length ? Math.round((bpms.reduce((sum, bpm) => sum + bpm, 0) / bpms.length) * 10) / 10 : null,
       bpmHistogram: [...histogram].toSorted(([a], [b]) => a - b).map(([bucket, count]) => ({ bucket, count })),
       keys: [...keys].toSorted(([, a], [, b]) => b - a).map(([key, count]) => ({ key, count })),
