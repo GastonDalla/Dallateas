@@ -2,10 +2,57 @@ import { beforeEach, describe, expect, test } from "bun:test";
 
 import prisma from "@dallateas/db";
 
-import { callerFor, createFolder, createUser, expectTrpcError, hasDatabase, resetDatabase } from "./helpers";
+import { callerFor, createFolder, createUser, createVinyl, expectTrpcError, hasDatabase, resetDatabase } from "./helpers";
 
 describe.skipIf(!hasDatabase)("collection data integrity", () => {
   beforeEach(resetDatabase);
+
+  test("filtering by style alone returns the matching records", async () => {
+    const owner = await createUser();
+    const vinyl = await createVinyl(owner.id, [], { style: "Techno, Minimal" });
+    await createVinyl(owner.id, [], { style: "Disco" });
+
+    const { items } = await callerFor({ id: owner.id }).vinylsList({ styles: ["Minimal"] });
+
+    expect(items.map((v) => v.id)).toEqual([vinyl.id]);
+  });
+
+  test("search ignores case", async () => {
+    const owner = await createUser();
+    const vinyl = await createVinyl(owner.id);
+
+    const { items } = await callerFor({ id: owner.id }).vinylsList({ search: "robert HOOD" });
+
+    expect(items.map((v) => v.id)).toEqual([vinyl.id]);
+  });
+
+  test("editing a record keeps its place in the folders it stays in", async () => {
+    const owner = await createUser();
+    const caller = callerFor({ id: owner.id });
+    const folder = await createFolder(owner.id, { type: "SET" });
+    const first = await createVinyl(owner.id, [folder.id]);
+    const second = await createVinyl(owner.id, [folder.id], { title: "Second" });
+    await caller.folderReorderVinyls({ folderId: folder.id, vinylOrder: [second.id, first.id] });
+
+    await caller.vinylUpdate({ id: first.id, title: "Renamed", artist: "Robert Hood", folderIds: [folder.id] });
+
+    const { vinyls } = await caller.folderGet({ id: folder.id });
+    expect(vinyls.map((v) => v.id)).toEqual([second.id, first.id]);
+  });
+
+  test("a record added to a folder lands at the end", async () => {
+    const owner = await createUser();
+    const caller = callerFor({ id: owner.id });
+    const folder = await createFolder(owner.id, { type: "SET" });
+    const first = await createVinyl(owner.id, [folder.id]);
+    const second = await createVinyl(owner.id, [folder.id], { title: "Second" });
+    const third = await createVinyl(owner.id, [], { title: "Third" });
+
+    await caller.vinylUpdate({ id: third.id, title: "Third", artist: "Robert Hood", folderIds: [folder.id] });
+
+    const { vinyls } = await caller.folderGet({ id: folder.id });
+    expect(vinyls.map((v) => v.id)).toEqual([first.id, second.id, third.id]);
+  });
 
   test("editing a folder without touching the password keeps it", async () => {
     const owner = await createUser();
@@ -62,5 +109,23 @@ describe.skipIf(!hasDatabase)("collection data integrity", () => {
     const after = await prisma.folder.findUniqueOrThrow({ where: { id: folder.id } });
     expect(after.viewCount).toBe(before.viewCount + 1);
     expect(after.updatedAt).toEqual(before.updatedAt);
+  });
+
+  test("duplicate tag names on a record do not fail", async () => {
+    const owner = await createUser();
+
+    const vinyl = await createVinyl(owner.id, [], { tagNames: ["peak", "peak"] });
+
+    const detail = await callerFor({ id: owner.id }).vinylGet({ id: vinyl.id });
+    expect(detail.tags).toHaveLength(1);
+  });
+
+  test("renaming a tag onto an existing one reports a conflict", async () => {
+    const owner = await createUser();
+    const caller = callerFor({ id: owner.id });
+    const first = await caller.tagCreate({ name: "warmup" });
+    await caller.tagCreate({ name: "peak" });
+
+    await expectTrpcError(caller.tagRename({ id: first.id, name: "peak" }), "CONFLICT");
   });
 });
