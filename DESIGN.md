@@ -37,7 +37,7 @@ Reading this as: a crate manager for vinyl DJs, a printed record-shop language o
 
 ```design-tokens
 fonts: Barlow, Barlow Condensed
-colors: #F4F4F2, #FFFFFF, #161615, #5E5E59, #FF5B14, #FFE8DC, #A83600, #2F7D54, #B7791F, #C4312B, #121211, #1A1A18, #232321, #F2F1ED, #A3A29B, #FF6A1F, #3A2013, #FFC5A8, #FF9463, #5CC48F, #E0A94A, #F0776F
+colors: #F4F4F2, #FFFFFF, #161615, #5E5E59, #FF5B14, #FFE8DC, #A83600, #2F7D54, #8A5A0B, #C4312B, #D9480F, #121211, #1A1A18, #232321, #F2F1ED, #A3A29B, #FF6A1F, #3A2013, #FFC5A8, #FF9463, #5CC48F, #E0A94A, #F0776F
 radii: 0, 2px, 4px, 8px, 9999px
 ```
 
@@ -52,7 +52,9 @@ radii: 0, 2px, 4px, 8px, 9999px
 | `--accent` | #FFE8DC | #3A2013 | pale tint for areas: active nav row, selected rows |
 | `--accent-foreground` | #A83600 | #FFC5A8 | ink on the tint |
 | `--link` | #A83600 | #FF9463 | the hue as text, AA on the ground |
-| `--good`, `--warn`, `--clash` | #2F7D54, #B7791F, #C4312B | #5CC48F, #E0A94A, #F0776F | a transition that works, needs care, or will hurt. Meaning only |
+| `--good`, `--warn`, `--clash` | #2F7D54, #8A5A0B, #C4312B | #5CC48F, #E0A94A, #F0776F | a transition that works, needs care, or will hurt. Meaning only |
+
+The fluo is 2.8:1 on sleeve paper, fine as a fill under dark ink but too weak as a line, so charts use `--chart-1` (#D9480F on light).
 
 ## 5. Typography
 

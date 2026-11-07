@@ -2,7 +2,7 @@ import prisma from "@dallateas/db";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
-import { hashFolderPassword, toClientFolder } from "../folder-access";
+import { hashFolderPassword, requireFolderEditor, toClientFolder } from "../folder-access";
 import { protectedProcedure, router } from "../index";
 import { collaboratorRole, folderInput, recordId, userId } from "../schemas";
 
@@ -140,7 +140,7 @@ export const folderRouter = router({
   folderReorderVinyls: protectedProcedure
     .input(z.object({ folderId: recordId, vinylOrder: z.array(recordId).max(500) }))
     .mutation(async ({ ctx, input }) => {
-      await requireOwnedFolder(input.folderId, ctx.session.user.id);
+      await requireFolderEditor(input.folderId, ctx.session);
       await prisma.$transaction(
         input.vinylOrder.map((vinylId, position) =>
           prisma.folderVinyl.updateMany({ where: { folderId: input.folderId, vinylId }, data: { position } }),

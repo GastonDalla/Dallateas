@@ -468,6 +468,17 @@ describe.skipIf(!hasDatabase)("per-track BPM", () => {
     expect(after.totalSeconds).toBe(6 * 60 + 30 + 5 * 60 + 10);
   });
 
+  test("the set flow says where each tempo came from", async () => {
+    const owner = await createUser();
+    const caller = callerFor({ id: owner.id });
+    const folder = await createFolder(owner.id, { type: "SET" });
+    const vinyl = await createVinyl(owner.id, [folder.id], { tracks: twoTracks });
+    const { tracks } = await caller.vinylGet({ id: vinyl.id });
+    await caller.trackUpdate({ id: tracks[0]!.id, bpm: 124, bpmSource: "LOOKUP" });
+
+    expect((await caller.folderSetFlow({ folderId: folder.id })).rows[0]?.bpmSource).toBe("LOOKUP");
+  });
+
   test("a set stays private to its members", async () => {
     const owner = await createUser();
     const stranger = await createUser();

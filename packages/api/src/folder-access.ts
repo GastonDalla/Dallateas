@@ -3,6 +3,7 @@ import { promisify } from "node:util";
 
 import prisma from "@dallateas/db";
 import { env } from "@dallateas/env/server";
+import { TRPCError } from "@trpc/server";
 
 import type { Context } from "./context";
 
@@ -96,6 +97,22 @@ export async function resolveFolderAccess(
     !member && folder.password !== null && !hasValidUnlock(folder.id, folder.password, ctx.cookies);
 
   return { visible, locked, member };
+}
+
+/** Owners and collaborators with edit rights may change a shared folder's order and cuts. */
+export async function requireFolderEditor(folderId: string, session: { user: { id: string } }) {
+  const folder = await prisma.folder.findUnique({
+    where: { id: folderId },
+    select: { userId: true, collaborators: { where: { userId: session.user.id }, select: { role: true } } },
+  });
+  const collaborator = folder?.collaborators[0];
+
+  if (!folder || (folder.userId !== session.user.id && !collaborator)) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Carpeta no encontrada" });
+  }
+  if (folder.userId !== session.user.id && collaborator?.role !== "EDITOR" && collaborator?.role !== "ADMIN") {
+    throw new TRPCError({ code: "FORBIDDEN", message: "Tu rol en esta carpeta no permite editarla" });
+  }
 }
 
 /** Listing filter matching `resolveFolderAccess` for people who are not members. */

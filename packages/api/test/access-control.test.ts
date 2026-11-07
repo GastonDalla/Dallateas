@@ -182,6 +182,42 @@ describe.skipIf(!hasDatabase)("folder and vinyl access control", () => {
     expect(vinyls[0]).toMatchObject({ pricePaid: null, mixNotes: null });
   });
 
+  test("an editor can reorder a shared set and a viewer cannot", async () => {
+    const owner = await createUser();
+    const editor = await createUser();
+    const viewer = await createUser();
+    const stranger = await createUser();
+    const folder = await createFolder(owner.id, { type: "SET", visibility: "PRIVATE" });
+    const first = await createVinyl(owner.id, [folder.id]);
+    const second = await createVinyl(owner.id, [folder.id], { title: "Second" });
+    const ownerCaller = callerFor({ id: owner.id });
+    await ownerCaller.folderInvite({ folderId: folder.id, email: editor.email, role: "EDITOR" });
+    await ownerCaller.folderInvite({ folderId: folder.id, email: viewer.email, role: "VIEWER" });
+    const order = { folderId: folder.id, vinylOrder: [second.id, first.id] };
+
+    await expectTrpcError(callerFor({ id: viewer.id }).folderReorderVinyls(order), "FORBIDDEN");
+    await expectTrpcError(callerFor({ id: stranger.id }).folderReorderVinyls(order), "NOT_FOUND");
+
+    await callerFor({ id: editor.id }).folderReorderVinyls(order);
+    const { vinyls } = await ownerCaller.folderGet({ id: folder.id });
+    expect(vinyls.map((vinyl) => vinyl.id)).toEqual([second.id, first.id]);
+  });
+
+  test("an editor can choose the cut of a record in a shared set", async () => {
+    const owner = await createUser();
+    const editor = await createUser();
+    const folder = await createFolder(owner.id, { type: "SET", visibility: "PRIVATE" });
+    const vinyl = await createVinyl(owner.id, [folder.id], { tracks: [{ side: "A1", position: 0, title: "Minus" }] });
+    const ownerCaller = callerFor({ id: owner.id });
+    const { tracks } = await ownerCaller.vinylGet({ id: vinyl.id });
+    await ownerCaller.folderInvite({ folderId: folder.id, email: editor.email, role: "EDITOR" });
+
+    await callerFor({ id: editor.id }).folderSetTrack({ folderId: folder.id, vinylId: vinyl.id, trackId: tracks[0]!.id });
+
+    const flow = await ownerCaller.folderSetFlow({ folderId: folder.id });
+    expect(flow.rows[0]).toMatchObject({ trackId: tracks[0]!.id, chosen: true });
+  });
+
   test("an owner can remove a collaborator and change their role", async () => {
     const owner = await createUser();
     const guest = await createUser();

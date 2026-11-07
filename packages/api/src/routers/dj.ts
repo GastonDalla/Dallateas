@@ -6,6 +6,7 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
 import { lookupTrackBpm } from "../bpm-lookup";
+import { requireFolderEditor } from "../folder-access";
 import { protectedProcedure, router } from "../index";
 import { consumeRateLimit } from "../rate-limit";
 import { tempoChange } from "../track-tempo";
@@ -154,7 +155,9 @@ export const djRouter = router({
         where: { folderId: input.folderId },
         orderBy: { position: "asc" },
         select: {
-          track: { select: { id: true, title: true, side: true, duration: true, bpm: true, camelotKey: true } },
+          track: {
+            select: { id: true, title: true, side: true, duration: true, bpm: true, bpmSource: true, camelotKey: true },
+          },
           vinyl: {
             select: {
               id: true,
@@ -164,7 +167,15 @@ export const djRouter = router({
               location: true,
               bpm: true,
               tracks: {
-                select: { id: true, title: true, side: true, duration: true, bpm: true, camelotKey: true },
+                select: {
+                  id: true,
+                  title: true,
+                  side: true,
+                  duration: true,
+                  bpm: true,
+                  bpmSource: true,
+                  camelotKey: true,
+                },
                 orderBy: { position: "asc" },
               },
             },
@@ -182,6 +193,7 @@ export const djRouter = router({
           chosen: Boolean(track),
           label: active ? `${active.side} ${active.title}` : vinyl.title,
           bpm: active?.bpm ?? vinyl.bpm,
+          bpmSource: active?.bpm == null ? null : active.bpmSource,
           key: active?.camelotKey ?? null,
           keyLabel: active?.camelotKey ? keyLabel(parseKey(active.camelotKey)!) : null,
           duration: active?.duration ?? null,
@@ -194,9 +206,7 @@ export const djRouter = router({
   folderSetTrack: protectedProcedure
     .input(z.object({ folderId: recordId, vinylId: recordId, trackId: recordId.nullable() }))
     .mutation(async ({ ctx, input }) => {
-      const userId = ctx.session.user.id;
-      const folder = await prisma.folder.findFirst({ where: { id: input.folderId, userId }, select: { id: true } });
-      if (!folder) throw new TRPCError({ code: "NOT_FOUND", message: "Carpeta no encontrada" });
+      await requireFolderEditor(input.folderId, ctx.session);
 
       if (input.trackId) {
         const owned = await prisma.vinylTrack.count({ where: { id: input.trackId, vinylId: input.vinylId } });
