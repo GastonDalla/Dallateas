@@ -12,7 +12,6 @@
         "BETTER_AUTH_SECRET",
         "BETTER_AUTH_URL",
         "CORS_ORIGIN",
-        "DB_PROVIDER",
         "DATABASE_URL",
         "DATABASE_URL_UNPOOLED",
         "DISCOGS_KEY",
@@ -49,9 +48,6 @@
     "db:studio": {
       "cache": false,
       "persistent": true
-    },
-    "db:local": {
-      "cache": false
     }
   }
 }

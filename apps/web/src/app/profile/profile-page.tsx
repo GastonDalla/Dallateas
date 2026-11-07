@@ -14,7 +14,6 @@ import {
   Eye,
   EyeOff,
   Globe,
-  Instagram,
   LayoutGrid,
   Loader2,
   Mail,
@@ -26,8 +25,8 @@ import {
   SlidersHorizontal,
   Trash2,
   X,
-  Youtube,
 } from "lucide-react";
+import { InstagramIcon, YoutubeIcon } from "@/components/brand-icons";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";

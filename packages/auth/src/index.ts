@@ -19,7 +19,7 @@ import {
 
 export const auth = betterAuth({
   database: prismaAdapter(prisma, {
-    provider: env.DB_PROVIDER ?? "sqlite",
+    provider: "postgresql",
   }),
 
   appName: "Dallateas",

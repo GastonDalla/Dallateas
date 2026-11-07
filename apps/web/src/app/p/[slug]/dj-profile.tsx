@@ -11,10 +11,10 @@ import {
   Eye,
   Folder,
   Globe,
-  Instagram,
   Link2,
   Mail,
   MapPin,
+  type LucideIcon,
   MessageCircle,
   Music,
   Phone,
@@ -22,16 +22,16 @@ import {
   Send,
   Star,
   Ticket,
-  Youtube,
 } from "lucide-react";
+import { InstagramIcon, YoutubeIcon } from "@/components/brand-icons";
 import Link from "next/link";
 import { useRef } from "react";
 
 import { trpc } from "@/utils/trpc";
 
-const PLATFORM_ICONS: Record<string, typeof Instagram> = {
-  instagram: Instagram,
-  youtube: Youtube,
+const PLATFORM_ICONS: Record<string, typeof InstagramIcon | LucideIcon> = {
+  instagram: InstagramIcon,
+  youtube: YoutubeIcon,
   soundcloud: Music,
   mixcloud: Music,
   bandcamp: Music,

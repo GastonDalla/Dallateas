@@ -1,7 +1,11 @@
-import prisma from "@/lib/prisma";
+import prisma from "@dallateas/db";
 import type { MetadataRoute } from "next";
+import { connection } from "next/server";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  // Rendered per request so a build never depends on the database being reachable.
+  await connection();
+
   const baseUrl = process.env.BETTER_AUTH_URL ?? "https://dallateas.com";
 
   const staticPages: MetadataRoute.Sitemap = [

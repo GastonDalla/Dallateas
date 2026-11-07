@@ -8,6 +8,7 @@ import "../index.css";
 import Header from "@/components/header";
 import { BottomNav } from "@/components/bottom-nav";
 import Providers from "@/components/providers";
+import { ServiceWorker } from "@/components/service-worker";
 
 const inter = Inter({
   variable: "--font-sans",
@@ -114,6 +115,7 @@ export default function RootLayout({
           </div>
           <BottomNav />
         </Providers>
+        <ServiceWorker />
         <Analytics />
         <SpeedInsights />
       </body>

@@ -1,19 +1,17 @@
 import { env } from "@dallateas/env/server";
+import { PrismaPg } from "@prisma/adapter-pg";
 
 import { PrismaClient } from "../prisma/generated/client";
 
-function createPrismaClient() {
-  if (env.DB_PROVIDER === "postgresql") {
-    const { PrismaPg } = require("@prisma/adapter-pg");
-    const adapter = new PrismaPg({ connectionString: env.DATABASE_URL });
-    return new PrismaClient({ adapter });
-  }
+const globalForPrisma = globalThis as typeof globalThis & { prisma?: PrismaClient };
 
-  const { PrismaLibSql } = require("@prisma/adapter-libsql");
-  const adapter = new PrismaLibSql({ url: env.DATABASE_URL });
-  return new PrismaClient({ adapter });
+function createPrismaClient() {
+  return new PrismaClient({ adapter: new PrismaPg({ connectionString: env.DATABASE_URL }) });
 }
 
-const prisma = createPrismaClient();
+// Reuse one client across hot reloads so development does not exhaust connections.
+const prisma = globalForPrisma.prisma ?? createPrismaClient();
+
+if (env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
 
 export default prisma;
