@@ -1,10 +1,9 @@
-import { auth } from "@dallateas/auth";
-import { headers } from "next/headers";
-import { redirect } from "next/navigation";
-
-import AdminDashboard from "./admin-dashboard";
-
 import type { Metadata } from "next";
+
+import { ADMIN_BATEAS_LIMIT } from "@/components/admin/admin-bateas";
+import { AdminDashboard } from "@/components/admin/admin-dashboard";
+import { requireAdmin } from "@/server/session";
+import { HydrateClient, prefetch, serverTrpc } from "@/server/trpc";
 
 export const metadata: Metadata = {
   title: "Admin",
@@ -12,12 +11,12 @@ export const metadata: Metadata = {
 };
 
 export default async function AdminPage() {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  });
+  await requireAdmin();
+  await prefetch(serverTrpc.adminFolders.queryOptions({ limit: ADMIN_BATEAS_LIMIT }));
 
-  if (!session?.user) redirect("/login");
-  if (session.user.role !== "admin") redirect("/dashboard");
-
-  return <AdminDashboard />;
+  return (
+    <HydrateClient>
+      <AdminDashboard />
+    </HydrateClient>
+  );
 }
