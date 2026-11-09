@@ -16,7 +16,7 @@
     "@dallateas/db": "workspace:*",
     "@dallateas/env": "workspace:*",
     "better-auth": "catalog:",
-    "nodemailer": "^10.3.1",
+    "nodemailer": "^10.4.0",
     "zod": "catalog:"
   },
   "devDependencies": {
