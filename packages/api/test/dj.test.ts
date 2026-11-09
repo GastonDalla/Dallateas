@@ -350,6 +350,32 @@ describe.skipIf(!hasDatabase)("per-track BPM", () => {
     expect((await caller.vinylGet({ id: vinyl.id })).tracks[0]?.bpm).toBe(124);
   });
 
+  test("a plain title takes the tempo of the source's original mix", async () => {
+    const owner = await createUser();
+    const vinyl = await createVinyl(owner.id, [], { tracks: [twoTracks[0]] });
+    stubDeezer({
+      "api.deezer.com/search": { data: [{ id: 7, title: "Minus (Original Mix)", artist: { name: "Robert Hood" } }] },
+      "api.deezer.com/track/7": { bpm: 128 },
+    });
+
+    await callerFor({ id: owner.id }).vinylLookupBpm({ id: vinyl.id });
+
+    expect((await callerFor({ id: owner.id }).vinylGet({ id: vinyl.id })).tracks[0]?.bpm).toBe(128);
+  });
+
+  test("a named version never takes the tempo of the plain title", async () => {
+    const owner = await createUser();
+    const vinyl = await createVinyl(owner.id, [], { tracks: [{ side: "A1", position: 0, title: "Minus (Dub)" }] });
+    stubDeezer({
+      "api.deezer.com/search": { data: [{ id: 7, title: "Minus", artist: { name: "Robert Hood" } }] },
+      "api.deezer.com/track/7": { bpm: 128 },
+    });
+
+    await callerFor({ id: owner.id }).vinylLookupBpm({ id: vinyl.id });
+
+    expect((await callerFor({ id: owner.id }).vinylGet({ id: vinyl.id })).tracks[0]?.bpm).toBeNull();
+  });
+
   test("a track Deezer no longer has does not stop the rest of the record", async () => {
     const owner = await createUser();
     const caller = callerFor({ id: owner.id });

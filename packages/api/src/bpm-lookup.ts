@@ -107,7 +107,7 @@ async function itunesPreview(artist: string, title: string): Promise<string | nu
     const exactTitle = normalizeName(title);
     const match =
       candidates.find((result) => normalizeName(result.trackName ?? "") === exactTitle) ??
-      candidates.find((result) => result.trackName && sameTitle(result.trackName, title));
+      candidates.find((result) => result.trackName && sameTitle(title, result.trackName));
     return previewUrl(match?.previewUrl);
   } catch {
     return null;
@@ -135,7 +135,7 @@ export async function lookupTrackBpm(artist: string, title: string): Promise<Loo
   // A dub and an original share a title but rarely a tempo, so the exact version wins.
   const match =
     candidates.find((result) => normalizeName(result.title) === exactTitle) ??
-    candidates.find((result) => sameTitle(result.title, title));
+    candidates.find((result) => sameTitle(title, result.title));
 
   if (match) {
     const track = await deezer<DeezerTrack>(`/track/${match.id}`);
