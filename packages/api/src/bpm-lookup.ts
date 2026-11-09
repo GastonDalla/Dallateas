@@ -1,5 +1,9 @@
 const DEEZER_API = "https://api.deezer.com";
 const ITUNES_SEARCH = "https://itunes.apple.com/search";
+const RECCOBEATS_API = "https://api.reccobeats.com/v1";
+const RECCOBEATS_PAGE_SIZE = 50;
+/** A prolific artist has hundreds of tracks; past this many pages the search gives up. */
+const RECCOBEATS_MAX_PAGES = 6;
 const REQUEST_TIMEOUT_MS = 6000;
 const NO_DATA = 800;
 const UNKNOWN_ARTISTS = new Set(["various", "various artists", "unknown artist"]);
@@ -9,6 +13,9 @@ type DeezerError = { error?: { code?: number } };
 type DeezerSearch = DeezerError & { data?: { id: number; title: string; preview?: string; artist?: { name: string } }[] };
 type ItunesSearch = { results?: { artistName?: string; trackName?: string; previewUrl?: string }[] };
 type DeezerTrack = DeezerError & { bpm?: number };
+type ReccoTrack = { id: string; trackTitle: string; artists?: { name: string }[] };
+type ReccoPage<T> = { content?: T[]; totalPages?: number };
+type ReccoFeatures = { tempo?: number };
 
 type DeezerResponse<T> = { outcome: "ok"; body: T } | { outcome: "missing" } | { outcome: "failed" };
 
@@ -114,13 +121,92 @@ async function itunesPreview(artist: string, title: string): Promise<string | nu
   }
 }
 
+async function recco<T>(path: string): Promise<T | null> {
+  try {
+    const response = await fetch(`${RECCOBEATS_API}${path}`, {
+      headers: { accept: "application/json" },
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    });
+    return response.ok ? ((await response.json()) as T) : null;
+  } catch {
+    return null;
+  }
+}
+
+function pickTrack(tracks: ReccoTrack[], artist: string, title: string) {
+  const candidates = tracks.filter((track) => track.artists?.some((credit) => sameArtist(credit.name, artist)));
+  const exactTitle = normalizeName(title);
+  return (
+    candidates.find((track) => normalizeName(track.trackTitle) === exactTitle) ??
+    candidates.find((track) => sameTitle(title, track.trackTitle))
+  );
+}
+
+/** Every track ReccoBeats lists for artists with exactly this name, up to a few pages each. */
+async function artistCatalog(name: string): Promise<ReccoTrack[]> {
+  const artists = await recco<ReccoPage<{ id: string; name: string }>>(`/artist/search?searchText=${encodeURIComponent(name)}`);
+  const catalog: ReccoTrack[] = [];
+  for (const candidate of (artists?.content ?? []).filter((entry) => normalizeName(entry.name) === name)) {
+    const page = (number: number) =>
+      recco<ReccoPage<ReccoTrack>>(`/artist/${encodeURIComponent(candidate.id)}/track?page=${number}&size=${RECCOBEATS_PAGE_SIZE}`);
+    const first = await page(0);
+    // The first page says how many there are; the rest are fetched together.
+    const pages = Math.min(first?.totalPages ?? 0, RECCOBEATS_MAX_PAGES);
+    const rest = await Promise.all(Array.from({ length: Math.max(pages - 1, 0) }, (_, index) => page(index + 1)));
+    for (const tracks of [first, ...rest]) catalog.push(...(tracks?.content ?? []));
+  }
+  return catalog;
+}
+
+/**
+ * Artist catalogs fetched during one record's lookup. Every track of a record shares the artist,
+ * so the catalog is fetched once instead of once per track.
+ */
+export type ArtistCatalogs = Map<string, Promise<ReccoTrack[]>>;
+
+/** Its search reads titles only, so a common title is looked for among the artist's own tracks. */
+async function reccoTrack(artist: string, title: string, catalogs: ArtistCatalogs) {
+  const byTitle = await recco<ReccoPage<ReccoTrack>>(
+    `/track/search?searchText=${encodeURIComponent(title)}&size=${RECCOBEATS_PAGE_SIZE}`,
+  );
+  const found = pickTrack(byTitle?.content ?? [], artist, title);
+  if (found) return found;
+
+  const name = credits(artist)[0];
+  if (!name) return undefined;
+  let catalog = catalogs.get(name);
+  if (!catalog) {
+    catalog = artistCatalog(name);
+    catalogs.set(name, catalog);
+  }
+  return pickTrack(await catalog, artist, title);
+}
+
+/**
+ * ReccoBeats publishes the tempo Spotify used to, free and without a key. On the DJ's own techno
+ * collection it knew few records, but on every one it knew, its tempo matched the measured one and
+ * Beatport's to 0.3 BPM. It answers nothing on failure: Deezer's preview remains to measure.
+ */
+async function reccoTempo(artist: string, title: string, catalogs: ArtistCatalogs): Promise<number | null> {
+  const track = await reccoTrack(artist, title, catalogs);
+  if (!track) return null;
+  const features = await recco<ReccoFeatures>(`/track/${encodeURIComponent(track.id)}/audio-features`);
+  const tempo = features?.tempo;
+  return tempo && tempo > 0 ? Math.round(tempo * 10) / 10 : null;
+}
+
 /**
  * Looks a track up on Deezer, the one free source of BPM without an API key. On a sample of DJ
  * tracks it matched all of them but held a tempo for only half, and on a collection of vinyl-only
- * techno it held none, so when there is no tempo the answer carries a preview to measure instead:
- * Deezer's own, or Apple Music's when Deezer does not have the track. Any value is approximate.
+ * techno it held none, so ReccoBeats is asked next, and when neither has a tempo the answer carries
+ * a preview to measure instead: Deezer's own, or Apple Music's when Deezer does not have the track.
+ * Any value is approximate.
  */
-export async function lookupTrackBpm(artist: string, title: string): Promise<LookupResult> {
+export async function lookupTrackBpm(
+  artist: string,
+  title: string,
+  catalogs: ArtistCatalogs = new Map(),
+): Promise<LookupResult> {
   if (UNKNOWN_ARTISTS.has(normalizeName(artist))) return NOTHING;
 
   const query = encodeURIComponent(`${artist.replace(/\(\d+\)/g, "")} ${title}`);
@@ -137,16 +223,18 @@ export async function lookupTrackBpm(artist: string, title: string): Promise<Loo
     candidates.find((result) => normalizeName(result.title) === exactTitle) ??
     candidates.find((result) => sameTitle(title, result.title));
 
+  let deezerPreview: string | null = null;
   if (match) {
     const track = await deezer<DeezerTrack>(`/track/${match.id}`);
     if (track.outcome === "failed") return DEEZER_DOWN;
 
     const bpm = track.outcome === "ok" ? track.body.bpm : undefined;
     if (bpm && bpm > 0) return { bpm: Math.round(bpm * 10) / 10, unavailable: false, preview: null };
-
-    const preview = previewUrl(match.preview);
-    if (preview) return { ...NOTHING, preview };
+    deezerPreview = previewUrl(match.preview);
   }
 
-  return { ...NOTHING, preview: await itunesPreview(artist, title) };
+  const published = await reccoTempo(artist, title, catalogs);
+  if (published) return { bpm: published, unavailable: false, preview: null };
+
+  return { ...NOTHING, preview: deezerPreview ?? (await itunesPreview(artist, title)) };
 }

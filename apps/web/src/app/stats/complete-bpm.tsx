@@ -38,7 +38,7 @@ function Tally({ total, progress }: { total: number; progress: LookupProgress })
 }
 
 /**
- * Fills in tempos from Deezer, or measured on a Deezer or Apple Music preview, one record at a time,
+ * Fills in tempos from Deezer or ReccoBeats, or measured on a Deezer or Apple Music preview, one record at a time,
  * and says exactly what it found and what it did not.
  */
 export function CompleteBpm() {
@@ -130,7 +130,7 @@ export function CompleteBpm() {
           <>
             <p className="text-sm font-medium">{recordCount(missing.length)} con cortes sin BPM</p>
             <p className="text-sm text-pretty text-muted-foreground">
-              Se buscan en Deezer y Apple Music de a uno y quedan como aproximados, hasta que los midas
+              Se buscan en Deezer, ReccoBeats y Apple Music de a uno y quedan como aproximados, hasta que los midas
             </p>
           </>
         )}

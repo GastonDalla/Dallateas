@@ -38,7 +38,7 @@ const SHEETS: Sheet[] = [
   },
   {
     name: "Búsqueda",
-    body: "Buscamos el corte en Deezer y traemos el BPM que tengan. Ese número no salió de tu disco, así que queda hueco hasta que lo midas.",
+    body: "Buscamos el corte en Deezer y ReccoBeats y traemos el BPM que tengan. Ese número no salió de tu disco, así que queda hueco hasta que lo midas.",
     sticker: <BpmSticker tempo={String(LOOKUP_BPM)} approximate className={BIG_STICKER} />,
     stickerNote: "Hueco: aproximado, de una búsqueda",
     tone: cn(styles.paper, "bg-card text-foreground"),

@@ -5,7 +5,7 @@ import prisma from "@dallateas/db";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
-import { lookupTrackBpm } from "../bpm-lookup";
+import { type ArtistCatalogs, lookupTrackBpm } from "../bpm-lookup";
 import { requireFolderEditor } from "../folder-access";
 import { protectedProcedure, router } from "../index";
 import { consumeRateLimit } from "../rate-limit";
@@ -79,6 +79,7 @@ export const djRouter = router({
     let unavailable = false;
     const previews: { trackId: string; url: string }[] = [];
     const deadline = Date.now() + LOOKUP_BUDGET_MS;
+    const catalogs: ArtistCatalogs = new Map();
 
     // One at a time: Deezer limits requests per address.
     for (const track of vinyl.tracks.slice(0, MAX_TRACKS_PER_LOOKUP)) {
@@ -94,7 +95,7 @@ export const djRouter = router({
       }
 
       searched += 1;
-      const result = await lookupTrackBpm(vinyl.artist, track.title);
+      const result = await lookupTrackBpm(vinyl.artist, track.title, catalogs);
 
       if (result.unavailable) {
         unavailable = true;
