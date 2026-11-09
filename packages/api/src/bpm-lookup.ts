@@ -4,6 +4,10 @@ const RECCOBEATS_API = "https://api.reccobeats.com/v1";
 const RECCOBEATS_PAGE_SIZE = 50;
 /** A prolific artist has hundreds of tracks; past this many pages the search gives up. */
 const RECCOBEATS_MAX_PAGES = 6;
+/** A common name is shared by many artists; only the first few with exactly that name are read. */
+const RECCOBEATS_MAX_ARTISTS = 2;
+/** All of one track's ReccoBeats requests together, so a hanging service cannot hold a lookup. */
+const RECCOBEATS_BUDGET_MS = 8000;
 const REQUEST_TIMEOUT_MS = 6000;
 const NO_DATA = 800;
 const UNKNOWN_ARTISTS = new Set(["various", "various artists", "unknown artist"]);
@@ -121,14 +125,21 @@ async function itunesPreview(artist: string, title: string): Promise<string | nu
   }
 }
 
-async function recco<T>(path: string): Promise<T | null> {
+/** A tempo from ReccoBeats is a bonus: any failure is null, logged so an outage is not invisible. */
+async function recco<T>(path: string, budget: AbortSignal): Promise<T | null> {
+  const endpoint = path.split("?")[0];
   try {
     const response = await fetch(`${RECCOBEATS_API}${path}`, {
       headers: { accept: "application/json" },
-      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      signal: AbortSignal.any([AbortSignal.timeout(REQUEST_TIMEOUT_MS), budget]),
     });
-    return response.ok ? ((await response.json()) as T) : null;
-  } catch {
+    if (!response.ok) {
+      console.warn(`ReccoBeats answered ${response.status} on ${endpoint}`);
+      return null;
+    }
+    return (await response.json()) as T;
+  } catch (error) {
+    console.warn(`ReccoBeats failed on ${endpoint}: ${error instanceof Error ? error.name : "unknown error"}`);
     return null;
   }
 }
@@ -143,12 +154,19 @@ function pickTrack(tracks: ReccoTrack[], artist: string, title: string) {
 }
 
 /** Every track ReccoBeats lists for artists with exactly this name, up to a few pages each. */
-async function artistCatalog(name: string): Promise<ReccoTrack[]> {
-  const artists = await recco<ReccoPage<{ id: string; name: string }>>(`/artist/search?searchText=${encodeURIComponent(name)}`);
+async function artistCatalog(name: string, budget: AbortSignal): Promise<ReccoTrack[]> {
+  const artists = await recco<ReccoPage<{ id: string; name: string }>>(
+    `/artist/search?searchText=${encodeURIComponent(name)}`,
+    budget,
+  );
+  const namesakes = (artists?.content ?? []).filter((entry) => normalizeName(entry.name) === name);
   const catalog: ReccoTrack[] = [];
-  for (const candidate of (artists?.content ?? []).filter((entry) => normalizeName(entry.name) === name)) {
+  for (const candidate of namesakes.slice(0, RECCOBEATS_MAX_ARTISTS)) {
     const page = (number: number) =>
-      recco<ReccoPage<ReccoTrack>>(`/artist/${encodeURIComponent(candidate.id)}/track?page=${number}&size=${RECCOBEATS_PAGE_SIZE}`);
+      recco<ReccoPage<ReccoTrack>>(
+        `/artist/${encodeURIComponent(candidate.id)}/track?page=${number}&size=${RECCOBEATS_PAGE_SIZE}`,
+        budget,
+      );
     const first = await page(0);
     // The first page says how many there are; the rest are fetched together.
     const pages = Math.min(first?.totalPages ?? 0, RECCOBEATS_MAX_PAGES);
@@ -165,9 +183,10 @@ async function artistCatalog(name: string): Promise<ReccoTrack[]> {
 export type ArtistCatalogs = Map<string, Promise<ReccoTrack[]>>;
 
 /** Its search reads titles only, so a common title is looked for among the artist's own tracks. */
-async function reccoTrack(artist: string, title: string, catalogs: ArtistCatalogs) {
+async function reccoTrack(artist: string, title: string, catalogs: ArtistCatalogs, budget: AbortSignal) {
   const byTitle = await recco<ReccoPage<ReccoTrack>>(
     `/track/search?searchText=${encodeURIComponent(title)}&size=${RECCOBEATS_PAGE_SIZE}`,
+    budget,
   );
   const found = pickTrack(byTitle?.content ?? [], artist, title);
   if (found) return found;
@@ -176,7 +195,7 @@ async function reccoTrack(artist: string, title: string, catalogs: ArtistCatalog
   if (!name) return undefined;
   let catalog = catalogs.get(name);
   if (!catalog) {
-    catalog = artistCatalog(name);
+    catalog = artistCatalog(name, budget);
     catalogs.set(name, catalog);
   }
   return pickTrack(await catalog, artist, title);
@@ -188,9 +207,10 @@ async function reccoTrack(artist: string, title: string, catalogs: ArtistCatalog
  * Beatport's to 0.3 BPM. It answers nothing on failure: Deezer's preview remains to measure.
  */
 async function reccoTempo(artist: string, title: string, catalogs: ArtistCatalogs): Promise<number | null> {
-  const track = await reccoTrack(artist, title, catalogs);
+  const budget = AbortSignal.timeout(RECCOBEATS_BUDGET_MS);
+  const track = await reccoTrack(artist, title, catalogs, budget);
   if (!track) return null;
-  const features = await recco<ReccoFeatures>(`/track/${encodeURIComponent(track.id)}/audio-features`);
+  const features = await recco<ReccoFeatures>(`/track/${encodeURIComponent(track.id)}/audio-features`, budget);
   const tempo = features?.tempo;
   return tempo && tempo > 0 ? Math.round(tempo * 10) / 10 : null;
 }
