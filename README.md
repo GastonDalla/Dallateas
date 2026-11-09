@@ -22,7 +22,7 @@ The design system is described in `DESIGN.md`.
 **Per-track tempo and key**
 - BPM, key, energy and cue notes on every cut of a record
 - Three ways to get a tempo, each stored with its source: tap, microphone, or a lookup
-- Lookups are marked approximate. Deezer is the free source without an API key, and it holds a tempo for about half of DJ tracks. Discogs has none
+- Lookups are marked approximate. Deezer and ReccoBeats are the free sources without an API key: Deezer holds a tempo for about half of DJ tracks, ReccoBeats publishes the tempo Spotify used to, and a track in neither is measured on a Deezer or Apple Music preview. Discogs has none
 - Collection filters by BPM range and key, on a single cut
 
 **Mixing on turntables**

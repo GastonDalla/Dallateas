@@ -350,6 +350,32 @@ describe.skipIf(!hasDatabase)("per-track BPM", () => {
     expect((await caller.vinylGet({ id: vinyl.id })).tracks[0]?.bpm).toBe(124);
   });
 
+  test("a plain title takes the tempo of the source's original mix", async () => {
+    const owner = await createUser();
+    const vinyl = await createVinyl(owner.id, [], { tracks: [twoTracks[0]] });
+    stubDeezer({
+      "api.deezer.com/search": { data: [{ id: 7, title: "Minus (Original Mix)", artist: { name: "Robert Hood" } }] },
+      "api.deezer.com/track/7": { bpm: 128 },
+    });
+
+    await callerFor({ id: owner.id }).vinylLookupBpm({ id: vinyl.id });
+
+    expect((await callerFor({ id: owner.id }).vinylGet({ id: vinyl.id })).tracks[0]?.bpm).toBe(128);
+  });
+
+  test("a named version never takes the tempo of the plain title", async () => {
+    const owner = await createUser();
+    const vinyl = await createVinyl(owner.id, [], { tracks: [{ side: "A1", position: 0, title: "Minus (Dub)" }] });
+    stubDeezer({
+      "api.deezer.com/search": { data: [{ id: 7, title: "Minus", artist: { name: "Robert Hood" } }] },
+      "api.deezer.com/track/7": { bpm: 128 },
+    });
+
+    await callerFor({ id: owner.id }).vinylLookupBpm({ id: vinyl.id });
+
+    expect((await callerFor({ id: owner.id }).vinylGet({ id: vinyl.id })).tracks[0]?.bpm).toBeNull();
+  });
+
   test("a track Deezer no longer has does not stop the rest of the record", async () => {
     const owner = await createUser();
     const caller = callerFor({ id: owner.id });
@@ -463,6 +489,225 @@ describe.skipIf(!hasDatabase)("per-track BPM", () => {
     const result = await callerFor({ id: owner.id }).vinylLookupBpm({ id: vinyl.id });
 
     expect(result.previews.map(({ url }) => url)).toEqual(["https://audio-ssl.itunes.apple.com/minus.m4a"]);
+  });
+
+  test("a tempo ReccoBeats publishes fills a track Deezer has no tempo for", async () => {
+    const owner = await createUser();
+    const vinyl = await createVinyl(owner.id, [], { tracks: [twoTracks[0]] });
+    stubDeezer({
+      "api.deezer.com/search": {
+        data: [{ id: 7, title: "Minus", artist: { name: "Robert Hood" }, preview: "https://cdnt-preview.dzcdn.net/api/1/minus.mp3" }],
+      },
+      "api.deezer.com/track/7": { bpm: 0 },
+      "api.reccobeats.com/v1/track/search": {
+        content: [
+          { id: "other", trackTitle: "Minus", artists: [{ name: "Somebody Else" }] },
+          { id: "hood", trackTitle: "Minus", artists: [{ name: "Robert Hood" }] },
+        ],
+      },
+      "api.reccobeats.com/v1/track/hood/audio-features": { id: "hood", tempo: 128.04 },
+      "api.reccobeats.com/v1/track/other/audio-features": { id: "other", tempo: 95 },
+    });
+
+    expect(await callerFor({ id: owner.id }).vinylLookupBpm({ id: vinyl.id })).toMatchObject({ searched: 1, found: 1, previews: [] });
+    expect((await callerFor({ id: owner.id }).vinylGet({ id: vinyl.id })).tracks[0]).toMatchObject({ bpm: 128, bpmSource: "LOOKUP" });
+  });
+
+  test("a common title is looked for among the artist's own tracks on ReccoBeats", async () => {
+    const owner = await createUser();
+    const vinyl = await createVinyl(owner.id, [], { tracks: [twoTracks[0]] });
+    stubDeezer({
+      "api.deezer.com/search": { data: [] },
+      "api.reccobeats.com/v1/track/search": { content: [{ id: "other", trackTitle: "Minus", artists: [{ name: "Somebody Else" }] }] },
+      "api.reccobeats.com/v1/artist/search": {
+        content: [
+          { id: "hood-tribute", name: "Robert Hood Tribute" },
+          { id: "hood", name: "Robert Hood" },
+        ],
+      },
+      "api.reccobeats.com/v1/artist/hood/track": {
+        content: [{ id: "minus", trackTitle: "Minus (Original Mix)", artists: [{ name: "Robert Hood" }] }],
+        totalPages: 1,
+      },
+      "api.reccobeats.com/v1/track/minus/audio-features": { id: "minus", tempo: 132.1 },
+    });
+
+    expect(await callerFor({ id: owner.id }).vinylLookupBpm({ id: vinyl.id })).toMatchObject({ found: 1 });
+    expect((await callerFor({ id: owner.id }).vinylGet({ id: vinyl.id })).tracks[0]?.bpm).toBe(132.1);
+  });
+
+  test("a record's artist is looked up on ReccoBeats once, not once per track", async () => {
+    const owner = await createUser();
+    const vinyl = await createVinyl(owner.id, [], { tracks: twoTracks });
+    stubDeezer({
+      "api.deezer.com/search": { data: [] },
+      "api.reccobeats.com/v1/track/search": { content: [] },
+      "api.reccobeats.com/v1/artist/search": { content: [{ id: "hood", name: "Robert Hood" }] },
+      "api.reccobeats.com/v1/artist/hood/track": {
+        content: [
+          { id: "minus", trackTitle: "Minus", artists: [{ name: "Robert Hood" }] },
+          { id: "plus", trackTitle: "Plus", artists: [{ name: "Robert Hood" }] },
+        ],
+        totalPages: 1,
+      },
+      "api.reccobeats.com/v1/track/minus/audio-features": { tempo: 132 },
+      "api.reccobeats.com/v1/track/plus/audio-features": { tempo: 128 },
+    });
+
+    expect(await callerFor({ id: owner.id }).vinylLookupBpm({ id: vinyl.id })).toMatchObject({ searched: 2, found: 2 });
+    const urls = (globalThis.fetch as unknown as ReturnType<typeof mock>).mock.calls.map(([url]) => String(url));
+    expect(urls.filter((url) => url.includes("/artist/search"))).toHaveLength(1);
+    expect(urls.filter((url) => url.includes("/artist/hood/track"))).toHaveLength(1);
+  });
+
+  test("an artist catalog that failed part-way is fetched again for the next track", async () => {
+    const owner = await createUser();
+    const vinyl = await createVinyl(owner.id, [], { tracks: twoTracks });
+    let pageCalls = 0;
+    const answers: Record<string, unknown> = {
+      "api.deezer.com/search": { data: [] },
+      "api.reccobeats.com/v1/track/search": { content: [] },
+      "api.reccobeats.com/v1/artist/search": { content: [{ id: "hood", name: "Robert Hood" }] },
+      "api.reccobeats.com/v1/track/plus/audio-features": { tempo: 128 },
+    };
+    globalThis.fetch = mock(async (url: string | URL | Request) => {
+      const path = String(url);
+      if (path.includes("/artist/hood/track")) {
+        pageCalls += 1;
+        return pageCalls === 1
+          ? new Response("Service Unavailable", { status: 503 })
+          : Response.json({ content: [{ id: "plus", trackTitle: "Plus", artists: [{ name: "Robert Hood" }] }], totalPages: 1 });
+      }
+      const key = Object.keys(answers).find((fragment) => path.includes(fragment));
+      return key ? Response.json(answers[key]) : new Response("{}", { status: 404 });
+    }) as unknown as typeof fetch;
+
+    expect(await callerFor({ id: owner.id }).vinylLookupBpm({ id: vinyl.id })).toMatchObject({ searched: 2, found: 1 });
+    expect(pageCalls).toBe(2);
+    const { tracks } = await callerFor({ id: owner.id }).vinylGet({ id: vinyl.id });
+    expect(tracks.map((track) => track.bpm)).toEqual([null, 128]);
+  });
+
+  test("only the first two artists sharing the exact name are read", async () => {
+    const owner = await createUser();
+    const vinyl = await createVinyl(owner.id, [], { tracks: [twoTracks[0]] });
+    stubDeezer({
+      "api.deezer.com/search": { data: [] },
+      "api.reccobeats.com/v1/track/search": { content: [] },
+      "api.reccobeats.com/v1/artist/search": {
+        content: [
+          { id: "first", name: "Robert Hood" },
+          { id: "second", name: "Robert Hood" },
+          { id: "third", name: "Robert Hood" },
+        ],
+      },
+      "api.reccobeats.com/v1/artist/first/track": { content: [], totalPages: 1 },
+      "api.reccobeats.com/v1/artist/second/track": { content: [], totalPages: 1 },
+      "api.reccobeats.com/v1/artist/third/track": {
+        content: [{ id: "minus", trackTitle: "Minus", artists: [{ name: "Robert Hood" }] }],
+        totalPages: 1,
+      },
+      "api.reccobeats.com/v1/track/minus/audio-features": { tempo: 130 },
+    });
+
+    expect(await callerFor({ id: owner.id }).vinylLookupBpm({ id: vinyl.id })).toMatchObject({ found: 0 });
+    const urls = (globalThis.fetch as unknown as ReturnType<typeof mock>).mock.calls.map(([url]) => String(url));
+    expect(urls.some((url) => url.includes("/artist/third/track"))).toBe(false);
+  });
+
+  test("a track on a later page of the artist's catalog is found", async () => {
+    const owner = await createUser();
+    const vinyl = await createVinyl(owner.id, [], { tracks: [twoTracks[0]] });
+    stubDeezer({
+      "api.deezer.com/search": { data: [] },
+      "api.reccobeats.com/v1/track/search": { content: [] },
+      "api.reccobeats.com/v1/artist/search": { content: [{ id: "hood", name: "Robert Hood" }] },
+      "api.reccobeats.com/v1/artist/hood/track?page=0": {
+        content: [{ id: "plus", trackTitle: "Plus", artists: [{ name: "Robert Hood" }] }],
+        totalPages: 2,
+      },
+      "api.reccobeats.com/v1/artist/hood/track?page=1": {
+        content: [{ id: "minus", trackTitle: "Minus", artists: [{ name: "Robert Hood" }] }],
+        totalPages: 2,
+      },
+      "api.reccobeats.com/v1/track/minus/audio-features": { tempo: 131.96 },
+    });
+
+    await callerFor({ id: owner.id }).vinylLookupBpm({ id: vinyl.id });
+
+    expect((await callerFor({ id: owner.id }).vinylGet({ id: vinyl.id })).tracks[0]?.bpm).toBe(132);
+  });
+
+  test("a track ReccoBeats knows without a tempo still gets its preview measured", async () => {
+    const owner = await createUser();
+    const vinyl = await createVinyl(owner.id, [], { tracks: [twoTracks[0]] });
+    stubDeezer({
+      "api.deezer.com/search": {
+        data: [{ id: 7, title: "Minus", artist: { name: "Robert Hood" }, preview: "https://cdnt-preview.dzcdn.net/api/1/minus.mp3" }],
+      },
+      "api.deezer.com/track/7": { bpm: 0 },
+      "api.reccobeats.com/v1/track/search": { content: [{ id: "hood", trackTitle: "Minus", artists: [{ name: "Robert Hood" }] }] },
+      "api.reccobeats.com/v1/track/hood/audio-features": { tempo: 0 },
+    });
+
+    expect(await callerFor({ id: owner.id }).vinylLookupBpm({ id: vinyl.id })).toMatchObject({
+      found: 0,
+      previews: [{ url: "https://cdnt-preview.dzcdn.net/api/1/minus.mp3" }],
+    });
+  });
+
+  test(
+    "a hanging ReccoBeats is given up on and the preview is still handed back",
+    async () => {
+      const owner = await createUser();
+      const vinyl = await createVinyl(owner.id, [], { tracks: [twoTracks[0]] });
+      const deezer: Record<string, unknown> = {
+        "api.deezer.com/search": {
+          data: [{ id: 7, title: "Minus", artist: { name: "Robert Hood" }, preview: "https://cdnt-preview.dzcdn.net/api/1/minus.mp3" }],
+        },
+        "api.deezer.com/track/7": { bpm: 0 },
+      };
+      globalThis.fetch = mock(async (url: string | URL | Request, init?: RequestInit) => {
+        const path = String(url);
+        if (path.includes("reccobeats")) {
+          return new Promise<Response>((_, reject) =>
+            init?.signal?.addEventListener("abort", () => reject(init.signal?.reason), { once: true }),
+          );
+        }
+        const key = Object.keys(deezer).find((fragment) => path.includes(fragment));
+        return key ? Response.json(deezer[key]) : new Response("{}", { status: 404 });
+      }) as unknown as typeof fetch;
+
+      const started = Date.now();
+      const result = await callerFor({ id: owner.id }).vinylLookupBpm({ id: vinyl.id });
+
+      expect(Date.now() - started).toBeLessThan(12_000);
+      expect(result).toMatchObject({ unavailable: false, previews: [{ url: "https://cdnt-preview.dzcdn.net/api/1/minus.mp3" }] });
+    },
+    20_000,
+  );
+
+  test("ReccoBeats failing leaves the preview to measure, without calling the lookup failed", async () => {
+    const owner = await createUser();
+    const vinyl = await createVinyl(owner.id, [], { tracks: [twoTracks[0]] });
+    const deezer = {
+      "api.deezer.com/search": {
+        data: [{ id: 7, title: "Minus", artist: { name: "Robert Hood" }, preview: "https://cdnt-preview.dzcdn.net/api/1/minus.mp3" }],
+      },
+      "api.deezer.com/track/7": { bpm: 0 },
+    };
+    globalThis.fetch = mock(async (url: string | URL | Request) => {
+      const path = String(url);
+      if (path.includes("reccobeats")) return new Response("Service Unavailable", { status: 503 });
+      const key = Object.keys(deezer).find((fragment) => path.includes(fragment)) as keyof typeof deezer | undefined;
+      return key ? Response.json(deezer[key]) : new Response("{}", { status: 404 });
+    }) as unknown as typeof fetch;
+
+    expect(await callerFor({ id: owner.id }).vinylLookupBpm({ id: vinyl.id })).toMatchObject({
+      found: 0,
+      unavailable: false,
+      previews: [{ url: "https://cdnt-preview.dzcdn.net/api/1/minus.mp3" }],
+    });
   });
 
   test("a preview on any other host is never handed to the browser", async () => {
