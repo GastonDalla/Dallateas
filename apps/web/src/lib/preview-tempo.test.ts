@@ -79,7 +79,10 @@ describe("downloading a preview", () => {
   function hangingFetch() {
     globalThis.fetch = ((_url: string, init?: RequestInit) =>
       new Promise((_resolve, reject) => {
-        init?.signal?.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")));
+        // Like the real fetch: an aborted signal rejects at once, a later abort rejects when it comes.
+        const abort = () => reject(new DOMException("Aborted", "AbortError"));
+        if (init?.signal?.aborted) abort();
+        init?.signal?.addEventListener("abort", abort);
       })) as typeof fetch;
   }
 
@@ -87,6 +90,17 @@ describe("downloading a preview", () => {
     hangingFetch();
     try {
       await expect(downloadPreview(previews[0]!.url, undefined, 20)).rejects.toThrow();
+    } finally {
+      globalThis.fetch = realFetch;
+    }
+  });
+
+  test("does not start when the caller already cancelled", async () => {
+    hangingFetch();
+    const controller = new AbortController();
+    controller.abort();
+    try {
+      await expect(downloadPreview(previews[0]!.url, controller.signal, 60_000)).rejects.toThrow();
     } finally {
       globalThis.fetch = realFetch;
     }

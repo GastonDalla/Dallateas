@@ -13,6 +13,8 @@ export async function downloadPreview(url: string, signal?: AbortSignal, timeout
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   const cancel = () => controller.abort();
+  // A signal that is already aborted never fires "abort" again.
+  if (signal?.aborted) cancel();
   signal?.addEventListener("abort", cancel, { once: true });
 
   try {
