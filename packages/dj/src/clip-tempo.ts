@@ -14,6 +14,8 @@ const MIN_SHARE_OF_WINDOWS = 6;
  * and punk "Hardcore" share a word with dance styles and are not dance records.
  */
 const DANCE_STYLES = new Set(["acid", "electro", "minimal", "makina", "hardstyle", "schranz", "gabber", "happy hardcore"]);
+/** Discogs files both punk and the electronic dance style as "Hardcore"; the record's genre tells them apart. */
+const ELECTRONIC_ONLY_STYLES = new Set(["hardcore"]);
 /** Any named kind of house, techno or trance, such as "Hard Techno", "Electro House" or "Progressive Trance". */
 const DANCE_FAMILY = /\b(?:house|techno|trance)\b/i;
 /** Below this a dance record was heard at half its speed. */
@@ -79,8 +81,13 @@ export function voteTempo(samples: Float32Array, sampleRate: number): ClipTempo 
   return { bpm, windows, agreeing: readings.filter((reading) => Math.abs(reading - bpm) <= bpm * SAME_TEMPO).length };
 }
 
+/** Takes the record's Discogs styles and genres together. */
 function isDanceRecord(styles: readonly string[]) {
-  return styles.some((style) => DANCE_STYLES.has(style.trim().toLowerCase()) || DANCE_FAMILY.test(style));
+  const names = styles.map((style) => style.trim().toLowerCase());
+  const electronic = names.includes("electronic");
+  return names.some(
+    (name) => DANCE_STYLES.has(name) || DANCE_FAMILY.test(name) || (electronic && ELECTRONIC_ONLY_STYLES.has(name)),
+  );
 }
 
 /**

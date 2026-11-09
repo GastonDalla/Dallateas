@@ -427,7 +427,7 @@ describe.skipIf(!hasDatabase)("per-track BPM", () => {
 
   test("a track with no published tempo comes back with its Deezer preview to measure", async () => {
     const owner = await createUser();
-    const vinyl = await createVinyl(owner.id, [], { style: "Acid, Techno", tracks: [twoTracks[0]] });
+    const vinyl = await createVinyl(owner.id, [], { genre: "Electronic", style: "Acid, Techno", tracks: [twoTracks[0]] });
     const { tracks } = await callerFor({ id: owner.id }).vinylGet({ id: vinyl.id });
     stubDeezer({
       "api.deezer.com/search": {
@@ -442,7 +442,7 @@ describe.skipIf(!hasDatabase)("per-track BPM", () => {
       unavailable: false,
       remaining: 0,
       previews: [{ trackId: tracks[0]!.id, url: "https://cdnt-preview.dzcdn.net/api/1/minus.mp3" }],
-      styles: ["Acid", "Techno"],
+      styles: ["Acid", "Techno", "Electronic"],
     });
     expect((await callerFor({ id: owner.id }).vinylGet({ id: vinyl.id })).tracks[0]?.bpm).toBeNull();
   });

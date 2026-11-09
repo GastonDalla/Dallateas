@@ -71,6 +71,11 @@ describe("tempo of a dance record", () => {
     expect(danceTempo(95, ["Electroclash"])).toBe(95);
   });
 
+  test("hardcore is a dance style on an electronic record only", () => {
+    expect(danceTempo(85, ["Electronic", "Hardcore"])).toBe(170);
+    expect(danceTempo(85, ["Rock", "Hardcore"])).toBe(85);
+  });
+
   test("named variants of house, techno and trance are dance records", () => {
     expect(danceTempo(70, ["Hard Techno"])).toBe(140);
     expect(danceTempo(64, ["Electro House"])).toBe(128);

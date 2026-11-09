@@ -65,7 +65,12 @@ export const djRouter = router({
     const userId = ctx.session.user.id;
     const vinyl = await prisma.vinyl.findFirst({
       where: { id: input.id, userId },
-      select: { artist: true, style: true, tracks: { where: { bpm: null }, select: { id: true, title: true } } },
+      select: {
+        artist: true,
+        genre: true,
+        style: true,
+        tracks: { where: { bpm: null }, select: { id: true, title: true } },
+      },
     });
     if (!vinyl) throw new TRPCError({ code: "NOT_FOUND", message: "Vinilo no encontrado" });
 
@@ -108,8 +113,11 @@ export const djRouter = router({
       }
     }
 
-    // The record's styles let the browser tell a half-speed reading of a techno record from a slow record.
-    const styles = (vinyl.style ?? "").split(",").map((style) => style.trim()).filter(Boolean);
+    // The record's styles and genres let the browser tell a half-speed reading of a techno record from a slow record.
+    const styles = [vinyl.style, vinyl.genre]
+      .flatMap((names) => (names ?? "").split(","))
+      .map((name) => name.trim())
+      .filter(Boolean);
 
     // A record longer than one pass reports what is left, so callers can tell a partial run from a full one.
     return { searched, found, unavailable, remaining: vinyl.tracks.length - searched, previews, styles };

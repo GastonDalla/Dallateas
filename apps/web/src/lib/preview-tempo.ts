@@ -6,20 +6,35 @@ const ANALYSIS_RATE = 22_050;
 const DOWNLOAD_TIMEOUT_MS = 15_000;
 
 /**
+ * Downloads a preview, giving up after a timeout or when the caller cancels. A plain controller
+ * instead of AbortSignal.any, which Safari only has from 17.4.
+ */
+export async function downloadPreview(url: string, signal?: AbortSignal, timeoutMs = DOWNLOAD_TIMEOUT_MS) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const cancel = () => controller.abort();
+  signal?.addEventListener("abort", cancel, { once: true });
+
+  try {
+    const response = await fetch(url, { signal: controller.signal, credentials: "omit" });
+    return response.ok ? await response.arrayBuffer() : null;
+  } finally {
+    clearTimeout(timer);
+    signal?.removeEventListener("abort", cancel);
+  }
+}
+
+/**
  * Downloads a track's 30-second preview and measures its tempo in the browser,
  * or returns null when the clip does not give a clear one.
  */
 export async function measurePreview(url: string, styles: readonly string[], signal?: AbortSignal) {
-  const timeout = AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS);
-  const response = await fetch(url, {
-    signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
-    credentials: "omit",
-  });
-  if (!response.ok) return null;
+  const encoded = await downloadPreview(url, signal);
+  if (!encoded) return null;
 
   // An offline context decodes without a user gesture and without opening an audio device.
   const context = new OfflineAudioContext(1, 1, ANALYSIS_RATE);
-  const audio = await context.decodeAudioData(await response.arrayBuffer());
+  const audio = await context.decodeAudioData(encoded);
   return clipTempo(audio.getChannelData(0), audio.sampleRate, styles);
 }
 

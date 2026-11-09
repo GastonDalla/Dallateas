@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { measurePreviews } from "./preview-tempo";
+import { downloadPreview, measurePreviews } from "./preview-tempo";
 
 const previews = [
   { trackId: "a", url: "https://cdnt-preview.dzcdn.net/a.mp3" },
@@ -70,5 +70,37 @@ describe("measuring a lookup's previews", () => {
     );
 
     expect(saved).toEqual(["a"]);
+  });
+});
+
+describe("downloading a preview", () => {
+  const realFetch = globalThis.fetch;
+
+  function hangingFetch() {
+    globalThis.fetch = ((_url: string, init?: RequestInit) =>
+      new Promise((_resolve, reject) => {
+        init?.signal?.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")));
+      })) as typeof fetch;
+  }
+
+  test("gives up on a download that hangs, so the queue moves on", async () => {
+    hangingFetch();
+    try {
+      await expect(downloadPreview(previews[0]!.url, undefined, 20)).rejects.toThrow();
+    } finally {
+      globalThis.fetch = realFetch;
+    }
+  });
+
+  test("stops when the caller cancels, before the timeout", async () => {
+    hangingFetch();
+    const controller = new AbortController();
+    try {
+      const download = downloadPreview(previews[0]!.url, controller.signal, 60_000);
+      controller.abort();
+      await expect(download).rejects.toThrow();
+    } finally {
+      globalThis.fetch = realFetch;
+    }
   });
 });
