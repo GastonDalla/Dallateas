@@ -1,10 +1,11 @@
 "use client";
 
 import { Button } from "@dallateas/ui/components/button";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
+import { useVinylBpmLookup } from "@/hooks/use-vinyl-bpm-lookup";
 import { trpc } from "@/utils/trpc";
 
 import { runLookups, type LookupEnd, type LookupProgress } from "./lookup-run";
@@ -36,11 +37,14 @@ function Tally({ total, progress }: { total: number; progress: LookupProgress })
   );
 }
 
-/** Fills in tempos from Deezer, one record at a time, and says exactly what it found and what it did not. */
+/**
+ * Fills in tempos from Deezer, or measured on a Deezer or Apple Music preview, one record at a time,
+ * and says exactly what it found and what it did not.
+ */
 export function CompleteBpm() {
   const queryClient = useQueryClient();
   const missingQuery = useQuery(trpc.vinylsMissingBpm.queryOptions());
-  const lookup = useMutation(trpc.vinylLookupBpm.mutationOptions());
+  const lookupVinyl = useVinylBpmLookup();
 
   const [run, setRun] = useState<RunState>({ status: "idle" });
   const controllerRef = useRef<AbortController | null>(null);
@@ -55,7 +59,7 @@ export function CompleteBpm() {
     controllerRef.current = controller;
     setRun({ status: "running", total: ids.length, progress: NO_PROGRESS, stopping: false });
 
-    const { end, progress } = await runLookups(ids, (id) => lookup.mutateAsync({ id }), {
+    const { end, progress } = await runLookups(ids, (id) => lookupVinyl(id, controller.signal), {
       signal: controller.signal,
       onProgress: (next) =>
         setRun((current) => ({
@@ -126,7 +130,7 @@ export function CompleteBpm() {
           <>
             <p className="text-sm font-medium">{recordCount(missing.length)} con cortes sin BPM</p>
             <p className="text-sm text-pretty text-muted-foreground">
-              Se buscan en Deezer de a uno y quedan como aproximados, hasta que los midas
+              Se buscan en Deezer y Apple Music de a uno y quedan como aproximados, hasta que los midas
             </p>
           </>
         )}

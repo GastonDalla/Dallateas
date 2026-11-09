@@ -7,6 +7,7 @@ import { lazy, Suspense } from "react";
 import { getQueryClient } from "@/utils/trpc";
 
 import { AddVinylProvider } from "./add-vinyl-context";
+import { BpmAutofillProvider } from "./bpm-autofill";
 import { ThemeProvider } from "./theme-provider";
 import { VinylDrawer } from "./vinyl-drawer";
 
@@ -28,10 +29,12 @@ export default function Providers({ children, nonce }: { children: React.ReactNo
       nonce={nonce}
     >
       <QueryClientProvider client={queryClient}>
-        <AddVinylProvider>
-          {children}
-          <VinylDrawer />
-        </AddVinylProvider>
+        <BpmAutofillProvider>
+          <AddVinylProvider>
+            {children}
+            <VinylDrawer />
+          </AddVinylProvider>
+        </BpmAutofillProvider>
         {process.env.NODE_ENV === "development" && (
           <Suspense>
             <ReactQueryDevtools />

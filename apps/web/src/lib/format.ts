@@ -41,5 +41,5 @@ export const BPM_SOURCE_LABELS = {
   MANUAL: "cargado a mano",
   TAP: "medido con tap",
   MIC: "medido con el micrófono",
-  LOOKUP: "aproximado, buscado en Deezer",
+  LOOKUP: "aproximado, buscado en internet",
 } as const;

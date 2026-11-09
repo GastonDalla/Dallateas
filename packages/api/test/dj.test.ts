@@ -148,7 +148,7 @@ describe.skipIf(!hasDatabase)("per-track BPM", () => {
 
     const result = await caller.vinylLookupBpm({ id: vinyl.id });
 
-    expect(result).toEqual({ searched: 1, found: 1, unavailable: false, remaining: 0 });
+    expect(result).toEqual({ searched: 1, found: 1, unavailable: false, remaining: 0, previews: [], styles: [] });
     const updated = await caller.vinylGet({ id: vinyl.id });
     expect(updated.tracks[0]).toMatchObject({ bpm: 134.3, bpmSource: "LOOKUP" });
     expect(updated.tracks[1]).toMatchObject({ bpm: 131, bpmSource: "TAP" });
@@ -169,7 +169,7 @@ describe.skipIf(!hasDatabase)("per-track BPM", () => {
       "/track/8": { bpm: 140 },
     });
 
-    expect(await caller.vinylLookupBpm({ id: vinyl.id })).toEqual({ searched: 2, found: 0, unavailable: false, remaining: 0 });
+    expect(await caller.vinylLookupBpm({ id: vinyl.id })).toEqual({ searched: 2, found: 0, unavailable: false, remaining: 0, previews: [], styles: [] });
     expect((await caller.vinylGet({ id: vinyl.id })).tracks.map((track) => track.bpm)).toEqual([null, null]);
   });
 
@@ -183,7 +183,7 @@ describe.skipIf(!hasDatabase)("per-track BPM", () => {
 
     const result = await callerFor({ id: owner.id }).vinylLookupBpm({ id: vinyl.id });
 
-    expect(result).toEqual({ searched: 1, found: 0, unavailable: true, remaining: 1 });
+    expect(result).toEqual({ searched: 1, found: 0, unavailable: true, remaining: 1, previews: [], styles: [] });
     expect(offline).toHaveBeenCalledTimes(1);
   });
 
@@ -369,6 +369,8 @@ describe.skipIf(!hasDatabase)("per-track BPM", () => {
       searched: 2,
       found: 1,
       unavailable: false,
+      previews: [],
+      styles: [],
       remaining: 0,
     });
   });
@@ -402,6 +404,8 @@ describe.skipIf(!hasDatabase)("per-track BPM", () => {
       searched: 1,
       found: 0,
       unavailable: true,
+      previews: [],
+      styles: [],
       remaining: 1,
     });
   });
@@ -415,8 +419,105 @@ describe.skipIf(!hasDatabase)("per-track BPM", () => {
       searched: 2,
       found: 0,
       unavailable: false,
+      previews: [],
+      styles: [],
       remaining: 0,
     });
+  });
+
+  test("a track with no published tempo comes back with its Deezer preview to measure", async () => {
+    const owner = await createUser();
+    const vinyl = await createVinyl(owner.id, [], { style: "Acid, Techno", tracks: [twoTracks[0]] });
+    const { tracks } = await callerFor({ id: owner.id }).vinylGet({ id: vinyl.id });
+    stubDeezer({
+      "api.deezer.com/search": {
+        data: [{ id: 7, title: "Minus", artist: { name: "Robert Hood" }, preview: "https://cdnt-preview.dzcdn.net/api/1/minus.mp3" }],
+      },
+      "api.deezer.com/track/7": { bpm: 0 },
+    });
+
+    expect(await callerFor({ id: owner.id }).vinylLookupBpm({ id: vinyl.id })).toEqual({
+      searched: 1,
+      found: 0,
+      unavailable: false,
+      remaining: 0,
+      previews: [{ trackId: tracks[0]!.id, url: "https://cdnt-preview.dzcdn.net/api/1/minus.mp3" }],
+      styles: ["Acid", "Techno"],
+    });
+    expect((await callerFor({ id: owner.id }).vinylGet({ id: vinyl.id })).tracks[0]?.bpm).toBeNull();
+  });
+
+  test("a track Deezer does not have is looked for on Apple Music", async () => {
+    const owner = await createUser();
+    const vinyl = await createVinyl(owner.id, [], { tracks: [twoTracks[0]] });
+    stubDeezer({
+      "api.deezer.com/search": { data: [] },
+      "itunes.apple.com/search": {
+        results: [
+          { artistName: "Somebody Else", trackName: "Minus", previewUrl: "https://audio-ssl.itunes.apple.com/other.m4a" },
+          { artistName: "Robert Hood", trackName: "Minus", previewUrl: "https://audio-ssl.itunes.apple.com/minus.m4a" },
+        ],
+      },
+    });
+
+    const result = await callerFor({ id: owner.id }).vinylLookupBpm({ id: vinyl.id });
+
+    expect(result.previews.map(({ url }) => url)).toEqual(["https://audio-ssl.itunes.apple.com/minus.m4a"]);
+  });
+
+  test("a preview on any other host is never handed to the browser", async () => {
+    const owner = await createUser();
+    const vinyl = await createVinyl(owner.id, [], { tracks: [twoTracks[0]] });
+    stubDeezer({
+      "api.deezer.com/search": { data: [{ id: 7, title: "Minus", artist: { name: "Robert Hood" }, preview: "https://evil.example/minus.mp3" }] },
+      "api.deezer.com/track/7": { bpm: 0 },
+      "itunes.apple.com/search": {
+        results: [{ artistName: "Robert Hood", trackName: "Minus", previewUrl: "http://audio-ssl.itunes.apple.com/minus.m4a" }],
+      },
+    });
+
+    expect((await callerFor({ id: owner.id }).vinylLookupBpm({ id: vinyl.id })).previews).toEqual([]);
+  });
+
+  test("Apple Music failing does not stop the lookup or count as Deezer being down", async () => {
+    const owner = await createUser();
+    const vinyl = await createVinyl(owner.id, [], { tracks: twoTracks });
+    globalThis.fetch = mock(async (url: string | URL | Request) =>
+      String(url).includes("itunes.apple.com")
+        ? new Response("Forbidden", { status: 403 })
+        : Response.json({ data: [] }),
+    ) as unknown as typeof fetch;
+
+    expect(await callerFor({ id: owner.id }).vinylLookupBpm({ id: vinyl.id })).toMatchObject({
+      searched: 2,
+      unavailable: false,
+      previews: [],
+    });
+  });
+
+  test("a tempo measured on a preview is stored as approximate, only on a track still empty", async () => {
+    const owner = await createUser();
+    const caller = callerFor({ id: owner.id });
+    const vinyl = await createVinyl(owner.id, [], { tracks: twoTracks });
+    const { tracks } = await caller.vinylGet({ id: vinyl.id });
+    await caller.trackUpdate({ id: tracks[1]!.id, bpm: 131, bpmSource: "TAP" });
+
+    expect(await caller.trackSavePreviewBpm({ id: tracks[0]!.id, bpm: 138 })).toEqual({ saved: true });
+    expect(await caller.trackSavePreviewBpm({ id: tracks[1]!.id, bpm: 140 })).toEqual({ saved: false });
+
+    const updated = await caller.vinylGet({ id: vinyl.id });
+    expect(updated.tracks[0]).toMatchObject({ bpm: 138, bpmSource: "LOOKUP" });
+    expect(updated.tracks[1]).toMatchObject({ bpm: 131, bpmSource: "TAP" });
+  });
+
+  test("nobody can store a measured tempo on another DJ's track", async () => {
+    const owner = await createUser();
+    const stranger = await createUser();
+    const vinyl = await createVinyl(owner.id, [], { tracks: twoTracks });
+    const { tracks } = await callerFor({ id: owner.id }).vinylGet({ id: vinyl.id });
+
+    await expectTrpcError(callerFor({ id: stranger.id }).trackSavePreviewBpm({ id: tracks[0]!.id, bpm: 138 }), "NOT_FOUND");
+    expect((await callerFor({ id: owner.id }).vinylGet({ id: vinyl.id })).tracks[0]?.bpm).toBeNull();
   });
 
   test("the mix finder searches the DJ's own records on the chosen fader", async () => {

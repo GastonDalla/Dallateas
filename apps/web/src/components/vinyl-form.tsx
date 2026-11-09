@@ -7,6 +7,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { useHaptic } from "@/hooks/use-haptic";
+import { useBpmAutofill } from "@/components/bpm-autofill";
 import { useInvalidateCollection } from "@/hooks/use-invalidate-collection";
 import { fetchReleaseDetail, type DiscogsSearchRelease } from "@/lib/discogs";
 import { trpc } from "@/utils/trpc";
@@ -45,6 +46,7 @@ type VinylFormBodyProps = {
 function VinylFormBody({ id, initialValues, onSaved }: VinylFormBodyProps) {
   const haptic = useHaptic();
   const invalidate = useInvalidateCollection();
+  const autofillBpm = useBpmAutofill();
   const discogs = useDiscogsSearch();
   const [values, setValues] = useState(initialValues);
   const [error, setError] = useState<string | null>(null);
@@ -66,7 +68,14 @@ function VinylFormBody({ id, initialValues, onSaved }: VinylFormBodyProps) {
   }
 
   const createVinyl = useMutation(
-    trpc.vinylCreate.mutationOptions({ onSuccess: () => handleSaved("Vinilo guardado"), onError: handleFailed }),
+    trpc.vinylCreate.mutationOptions({
+      onSuccess: (vinyl) => {
+        // Its tracks get their tempo while the DJ carries on: a record is added, not looked up by hand.
+        if (values.tracks.length > 0) autofillBpm({ id: vinyl.id, title: vinyl.title });
+        handleSaved("Vinilo guardado");
+      },
+      onError: handleFailed,
+    }),
   );
   const updateVinyl = useMutation(
     trpc.vinylUpdate.mutationOptions({ onSuccess: () => handleSaved("Vinilo actualizado"), onError: handleFailed }),

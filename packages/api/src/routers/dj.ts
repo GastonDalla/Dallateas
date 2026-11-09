@@ -65,13 +65,14 @@ export const djRouter = router({
     const userId = ctx.session.user.id;
     const vinyl = await prisma.vinyl.findFirst({
       where: { id: input.id, userId },
-      select: { artist: true, tracks: { where: { bpm: null }, select: { id: true, title: true } } },
+      select: { artist: true, style: true, tracks: { where: { bpm: null }, select: { id: true, title: true } } },
     });
     if (!vinyl) throw new TRPCError({ code: "NOT_FOUND", message: "Vinilo no encontrado" });
 
     let searched = 0;
     let found = 0;
     let unavailable = false;
+    const previews: { trackId: string; url: string }[] = [];
     const deadline = Date.now() + LOOKUP_BUDGET_MS;
 
     // One at a time: Deezer limits requests per address.
@@ -95,6 +96,8 @@ export const djRouter = router({
         break;
       }
 
+      if (result.preview) previews.push({ trackId: track.id, url: result.preview });
+
       if (result.bpm !== null) {
         // Only an empty track: the DJ may have measured this one while the lookup was running.
         const { count } = await prisma.vinylTrack.updateMany({
@@ -105,9 +108,26 @@ export const djRouter = router({
       }
     }
 
+    // The record's styles let the browser tell a half-speed reading of a techno record from a slow record.
+    const styles = (vinyl.style ?? "").split(",").map((style) => style.trim()).filter(Boolean);
+
     // A record longer than one pass reports what is left, so callers can tell a partial run from a full one.
-    return { searched, found, unavailable, remaining: vinyl.tracks.length - searched };
+    return { searched, found, unavailable, remaining: vinyl.tracks.length - searched, previews, styles };
   }),
+
+  /** Stores a tempo the browser measured on a lookup's preview. Approximate, like any lookup. */
+  trackSavePreviewBpm: protectedProcedure
+    .input(z.object({ id: recordId, bpm: trackBpm }))
+    .mutation(async ({ ctx, input }) => {
+      await requireOwnedTrack(input.id, ctx.session.user.id);
+
+      // Only an empty track: the DJ may have measured this one while the preview was being measured.
+      const { count } = await prisma.vinylTrack.updateMany({
+        where: { id: input.id, bpm: null },
+        data: { bpm: Math.round(input.bpm * 10) / 10, bpmSource: "LOOKUP" },
+      });
+      return { saved: count > 0 };
+    }),
 
   vinylsMissingBpm: protectedProcedure.query(async ({ ctx }) => {
     const vinyls = await prisma.vinyl.findMany({

@@ -8,6 +8,9 @@ const FRAME_SOURCES = [
   "https://player-widget.mixcloud.com",
 ];
 
+/** Where track previews come from, measured in the browser for a tempo. Matches `previewUrl` in the API. */
+const PREVIEW_SOURCES = ["https://*.dzcdn.net", "https://*.itunes.apple.com"];
+
 function contentSecurityPolicy(nonce: string) {
   const development = process.env.NODE_ENV === "development";
 
@@ -17,7 +20,7 @@ function contentSecurityPolicy(nonce: string) {
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob: https:",
     "font-src 'self'",
-    `connect-src 'self' https://vitals.vercel-insights.com${development ? " ws:" : ""}`,
+    `connect-src 'self' https://vitals.vercel-insights.com ${PREVIEW_SOURCES.join(" ")}${development ? " ws:" : ""}`,
     "media-src 'self' blob:",
     `frame-src ${FRAME_SOURCES.join(" ")}`,
     "worker-src 'self' blob:",

@@ -63,7 +63,7 @@ describe("collectionCsv", () => {
 
   test("says a looked up tempo is approximate", () => {
     const row = lines(collectionCsv([{ ...record, tracks: [{ ...track, bpmSource: "LOOKUP" }] }]))[1];
-    expect(row).toContain('"aproximado, buscado en Deezer"');
+    expect(row).toContain('"aproximado, buscado en internet"');
   });
 
   test("escapes quotes, commas and line breaks", () => {

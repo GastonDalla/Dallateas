@@ -11,13 +11,13 @@ import { TrackMeasureDialog } from "@/components/dj/track-measure-dialog";
 import { EmptyState } from "@/components/shell/empty-state";
 import { actionClass } from "@/components/vinyl-form/field";
 import { useInvalidateCollection } from "@/hooks/use-invalidate-collection";
+import { useVinylBpmLookup, type VinylBpmLookup } from "@/hooks/use-vinyl-bpm-lookup";
 import type { DiscogsVideo } from "@/lib/discogs";
 import { formatRunningTime } from "@/lib/format";
-import { trpc } from "@/utils/trpc";
 
 import { TRACK_COLUMNS, TrackRow } from "./track-row";
 import { videoForTrack, youtubeVideoId } from "./track-video";
-import type { BpmLookup, Vinyl } from "./types";
+import type { Vinyl } from "./types";
 
 function cuts(count: number) {
   return count === 1 ? "1 corte" : `${count} cortes`;
@@ -34,11 +34,11 @@ function tracklistSummary(tracks: Vinyl["tracks"]) {
 }
 
 /** Says what happened, even when nothing did, and never presents a lookup as a measurement. */
-function lookupReport({ searched, found, unavailable, remaining }: BpmLookup) {
+function lookupReport({ searched, found, unavailable, remaining }: VinylBpmLookup) {
   const parts: string[] = [];
 
   if (searched === 0 && !unavailable) return "Ya tenés el BPM de todos los cortes";
-  if (found > 0) parts.push(`Encontré ${found} de ${searched}. Son aproximados: vienen de Deezer, medilos para confirmarlos`);
+  if (found > 0) parts.push(`Encontré ${found} de ${searched}. Son aproximados: confirmalos con el tap o el micrófono`);
   else if (searched > 0 && !unavailable) parts.push(`Busqué ${cuts(searched)} y no encontré ninguno. Medilos con el tap o el micrófono`);
 
   if (unavailable) parts.push("Deezer dejó de responder");
@@ -58,7 +58,8 @@ export function Tracklist({ vinyl, videos }: TracklistProps) {
   const [mixTrackId, setMixTrackId] = useState<string | null>(null);
   const [previewTrackId, setPreviewTrackId] = useState<string | null>(null);
 
-  const lookup = useMutation(trpc.vinylLookupBpm.mutationOptions({ onSuccess: () => invalidate(vinyl.id) }));
+  const lookupVinyl = useVinylBpmLookup();
+  const lookup = useMutation({ mutationFn: (id: string) => lookupVinyl(id), onSuccess: () => invalidate(vinyl.id) });
 
   const { tracks } = vinyl;
   const measuring = tracks.find(({ id }) => id === measuringId);
@@ -74,7 +75,7 @@ export function Tracklist({ vinyl, videos }: TracklistProps) {
           {tracks.length > 0 && <p className="tabular mt-1 text-[13px] text-muted-foreground">{tracklistSummary(tracks)}</p>}
         </div>
         {missingBpm && (
-          <Button type="button" className={actionClass} disabled={lookup.isPending} onClick={() => lookup.mutate({ id: vinyl.id })}>
+          <Button type="button" className={actionClass} disabled={lookup.isPending} onClick={() => lookup.mutate(vinyl.id)}>
             {lookup.isPending ? <Loader2 aria-hidden="true" className="animate-spin" /> : <Search aria-hidden="true" />}
             {lookup.isPending ? "Buscando BPM" : "Buscar BPM"}
           </Button>
