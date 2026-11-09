@@ -1,185 +1,138 @@
 "use client";
 
+import { Button, buttonVariants } from "@dallateas/ui/components/button";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Disc3 } from "lucide-react";
 import Link from "next/link";
+import type { ReactNode } from "react";
 
+import { KeyTag } from "@/components/dj/key-tag";
+import { EmptyState } from "@/components/shell/empty-state";
+import { PageHeader } from "@/components/shell/page-header";
+import { formatBpm } from "@/lib/format";
 import { trpc } from "@/utils/trpc";
 
-export default function StatsPage() {
-  const { data, isLoading } = useQuery(
-    trpc.collectionStats.queryOptions(),
-  );
+import { BpmHistogram } from "./bpm-histogram";
+import { CompleteBpm } from "./complete-bpm";
+import { RankedList, type RankedItem } from "./ranked-list";
+import { StatsSkeleton } from "./stats-skeleton";
 
-  if (isLoading) {
+const PAGE_CLASSES = "mx-auto flex w-full max-w-6xl flex-col gap-8 px-4 py-6 md:px-8 md:py-8";
+
+const money = new Intl.NumberFormat("es-AR", { maximumFractionDigits: 2 });
+
+type Coverage = { totalTracks: number; tracksWithBpm: number; approximateBpm: number };
+
+function coverage({ totalTracks, tracksWithBpm, approximateBpm }: Coverage) {
+  if (totalTracks === 0) return "Todavía no hay tracks cargados";
+
+  const measured = `${tracksWithBpm} de ${totalTracks} tracks con BPM`;
+  if (approximateBpm === 0) return measured;
+  return `${measured}, ${approximateBpm === 1 ? "1 aproximado" : `${approximateBpm} aproximados`}`;
+}
+
+function Figure({ label, note, children }: { label: string; note?: string; children: ReactNode }) {
+  return (
+    <div>
+      <dt className="text-[13px] text-muted-foreground">{label}</dt>
+      <dd>
+        <span className="tabular font-heading text-[28px] font-bold leading-tight">{children}</span>
+        {note && <span className="block text-[13px] text-muted-foreground">{note}</span>}
+      </dd>
+    </div>
+  );
+}
+
+function asRanking(entries: readonly (readonly [string, number])[]): RankedItem[] {
+  return entries.map(([name, count]) => ({ id: name, label: name, count }));
+}
+
+export default function StatsPage() {
+  const collectionQuery = useQuery(trpc.collectionStats.queryOptions());
+  const tracksQuery = useQuery(trpc.trackStats.queryOptions());
+
+  if (collectionQuery.isPending || tracksQuery.isPending) return <StatsSkeleton />;
+
+  if (collectionQuery.isError || tracksQuery.isError) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <Disc3 className="h-8 w-8 animate-spin text-muted-foreground" />
+      <div className={PAGE_CLASSES}>
+        <PageHeader title="Estadísticas" />
+        <EmptyState
+          title="No se pudieron cargar las estadísticas"
+          action={
+            <Button
+              variant="outline"
+              className="h-11 md:h-9"
+              onClick={() => {
+                void collectionQuery.refetch();
+                void tracksQuery.refetch();
+              }}
+            >
+              Reintentar
+            </Button>
+          }
+        />
       </div>
     );
   }
 
-  const stats = data;
+  const collection = collectionQuery.data;
+  const tracks = tracksQuery.data;
+
+  if (collection.totalVinyls === 0) {
+    return (
+      <div className={PAGE_CLASSES}>
+        <PageHeader title="Estadísticas" />
+        <EmptyState
+          title="Todavía no tenés vinilos"
+          description="Cuando cargues tu colección, acá vas a ver en qué tempos y tonalidades estás parado"
+          action={
+            <Link href="/import" className={buttonVariants({ className: "h-11 px-4 text-sm md:h-9" })}>
+              Importar vinilos
+            </Link>
+          }
+        />
+      </div>
+    );
+  }
+
+  const averageBpm = tracks.averageBpm ?? collection.avgBpm;
 
   return (
-    <div className="mx-auto max-w-2xl px-4 py-8 pb-24">
-      <Link
-        href="/dashboard"
-        className="mb-6 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
-      >
-        <ArrowLeft className="h-4 w-4" />
-        Volver al dashboard
-      </Link>
+    <div className={PAGE_CLASSES}>
+      <PageHeader title="Estadísticas" description={coverage(tracks)} />
 
-      <h1 className="font-heading mb-6 text-2xl font-bold">
-        Estadisticas de tu coleccion
-      </h1>
+      <dl className="grid grid-cols-2 gap-x-8 gap-y-5 sm:grid-cols-4">
+        <Figure label="Discos">{collection.totalVinyls}</Figure>
+        <Figure label="BPM promedio">
+          {averageBpm === null ? (
+            <span className="font-sans text-sm font-normal text-muted-foreground">—</span>
+          ) : (
+            formatBpm(Math.round(averageBpm))
+          )}
+        </Figure>
+        {collection.totalValue !== null && (
+          <Figure label="Valor de la colección" note={`${collection.pricedCount} de ${collection.totalVinyls} con precio`}>
+            ${money.format(collection.totalValue)}
+          </Figure>
+        )}
+        {collection.avgPrice !== null && <Figure label="Precio promedio">${money.format(collection.avgPrice)}</Figure>}
+      </dl>
 
-      {/* Stat cards */}
-      <div className="mb-8 grid grid-cols-2 gap-3">
-        <div className="rounded-lg border border-border/60 bg-card p-4 shadow-sm">
-          <p className="text-xs text-muted-foreground">Total vinilos</p>
-          <p className="font-heading text-2xl font-bold text-primary">
-            {stats?.totalVinyls ?? 0}
-          </p>
-        </div>
-        <div className="rounded-lg border border-border/60 bg-card p-4 shadow-sm">
-          <p className="text-xs text-muted-foreground">BPM promedio</p>
-          <p className="font-heading text-2xl font-bold text-primary">
-            {stats?.avgBpm ? Math.round(stats.avgBpm) : "—"}
-          </p>
-        </div>
-        {stats?.totalValue != null && (
-          <div className="rounded-lg border border-border/60 bg-card p-4 shadow-sm">
-            <p className="text-xs text-muted-foreground">Valor coleccion</p>
-            <p className="font-heading text-2xl font-bold text-primary">
-              ${stats.totalValue.toLocaleString()}
-            </p>
-            <p className="text-[10px] text-muted-foreground">
-              {stats.pricedCount} de {stats.totalVinyls} con precio
-            </p>
-          </div>
-        )}
-        {stats?.avgPrice != null && (
-          <div className="rounded-lg border border-border/60 bg-card p-4 shadow-sm">
-            <p className="text-xs text-muted-foreground">Precio promedio</p>
-            <p className="font-heading text-2xl font-bold text-primary">
-              ${stats.avgPrice.toLocaleString()}
-            </p>
-          </div>
-        )}
+      <CompleteBpm />
+
+      <div className="grid gap-x-12 gap-y-8 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+        <BpmHistogram buckets={tracks.bpmHistogram} />
+        <RankedList
+          title="Tonalidades"
+          items={tracks.keys.map(({ key, count }) => ({ id: key, label: <KeyTag value={key} />, count }))}
+        />
       </div>
 
-      {/* Top Genres */}
-      {stats?.topGenres && stats.topGenres.length > 0 && (
-        <section className="mb-8">
-          <h2 className="font-heading mb-3 text-lg font-semibold">
-            Top generos
-          </h2>
-          <div className="space-y-2">
-            {(() => {
-              const maxCount = Math.max(
-                ...stats.topGenres.map((g) => g[1]),
-              );
-              return stats.topGenres.map((genre) => (
-                <div key={genre[0]} className="flex items-center gap-3">
-                  <span className="w-24 shrink-0 truncate text-sm text-muted-foreground">
-                    {genre[0]}
-                  </span>
-                  <div className="relative h-6 flex-1 overflow-hidden rounded-md bg-card border border-border/60">
-                    <div
-                      className="h-full rounded-md bg-primary/80 transition-all"
-                      style={{
-                        width: `${(genre[1] / maxCount) * 100}%`,
-                      }}
-                    />
-                  </div>
-                  <span className="w-8 text-right text-xs font-medium text-foreground">
-                    {genre[1]}
-                  </span>
-                </div>
-              ));
-            })()}
-          </div>
-        </section>
-      )}
-
-      {/* Top Decades */}
-      {stats?.topDecades && stats.topDecades.length > 0 && (
-        <section className="mb-8">
-          <h2 className="font-heading mb-3 text-lg font-semibold">
-            Top decadas
-          </h2>
-          <div className="space-y-2">
-            {(() => {
-              const maxCount = Math.max(
-                ...stats.topDecades.map((d) => d[1]),
-              );
-              return stats.topDecades.map((decade) => (
-                <div key={decade[0]} className="flex items-center gap-3">
-                  <span className="w-24 shrink-0 truncate text-sm text-muted-foreground">
-                    {decade[0]}
-                  </span>
-                  <div className="relative h-6 flex-1 overflow-hidden rounded-md bg-card border border-border/60">
-                    <div
-                      className="h-full rounded-md bg-primary/80 transition-all"
-                      style={{
-                        width: `${(decade[1] / maxCount) * 100}%`,
-                      }}
-                    />
-                  </div>
-                  <span className="w-8 text-right text-xs font-medium text-foreground">
-                    {decade[1]}
-                  </span>
-                </div>
-              ));
-            })()}
-          </div>
-        </section>
-      )}
-
-      {/* Top Labels */}
-      {stats?.topLabels && stats.topLabels.length > 0 && (
-        <section className="mb-8">
-          <h2 className="font-heading mb-3 text-lg font-semibold">
-            Top sellos
-          </h2>
-          <div className="space-y-2">
-            {(() => {
-              const maxCount = Math.max(
-                ...stats.topLabels.map((l) => l[1]),
-              );
-              return stats.topLabels.map((label) => (
-                <div key={label[0]} className="flex items-center gap-3">
-                  <span className="w-24 shrink-0 truncate text-sm text-muted-foreground">
-                    {label[0]}
-                  </span>
-                  <div className="relative h-6 flex-1 overflow-hidden rounded-md bg-card border border-border/60">
-                    <div
-                      className="h-full rounded-md bg-primary/80 transition-all"
-                      style={{
-                        width: `${(label[1] / maxCount) * 100}%`,
-                      }}
-                    />
-                  </div>
-                  <span className="w-8 text-right text-xs font-medium text-foreground">
-                    {label[1]}
-                  </span>
-                </div>
-              ));
-            })()}
-          </div>
-        </section>
-      )}
-
-      {!stats?.totalVinyls && (
-        <div className="flex flex-col items-center gap-3 py-16 text-center">
-          <Disc3 className="h-10 w-10 text-muted-foreground/30" />
-          <p className="text-sm text-muted-foreground">
-            Aun no tenes vinilos para mostrar estadisticas.
-          </p>
-        </div>
-      )}
+      <div className="grid gap-x-12 gap-y-8 border-t border-border pt-6 md:grid-cols-[minmax(0,3fr)_minmax(0,2fr)_minmax(0,3fr)]">
+        <RankedList title="Géneros" items={asRanking(collection.topGenres)} />
+        <RankedList title="Décadas" items={asRanking(collection.topDecades)} />
+        <RankedList title="Sellos" items={asRanking(collection.topLabels)} />
+      </div>
     </div>
   );
 }

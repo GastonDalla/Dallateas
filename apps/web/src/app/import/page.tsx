@@ -1,10 +1,11 @@
-import { auth } from "@dallateas/auth";
-import { headers } from "next/headers";
-import { redirect } from "next/navigation";
+import { ArrowLeft } from "lucide-react";
+import type { Metadata } from "next";
+import Link from "next/link";
+
+import { PageHeader } from "@/components/shell/page-header";
+import { requireSession } from "@/server/session";
 
 import ImportPage from "./import-page";
-
-import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "Importar vinilos",
@@ -12,13 +13,19 @@ export const metadata: Metadata = {
 };
 
 export default async function Import() {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  });
+  await requireSession();
 
-  if (!session?.user) {
-    redirect("/login");
-  }
-
-  return <ImportPage />;
+  return (
+    <div className="mx-auto flex w-full max-w-4xl flex-col gap-6 px-4 py-6 md:px-8 md:py-8">
+      <Link
+        href="/dashboard"
+        className="inline-flex h-11 items-center gap-1.5 self-start text-sm text-muted-foreground transition-colors hover:text-foreground md:h-auto"
+      >
+        <ArrowLeft aria-hidden="true" className="size-4" />
+        Colección
+      </Link>
+      <PageHeader title="Importar vinilos" description="Traé tu colección desde un CSV o desde tu cuenta de Discogs" />
+      <ImportPage />
+    </div>
+  );
 }

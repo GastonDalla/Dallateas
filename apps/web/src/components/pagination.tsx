@@ -1,11 +1,12 @@
 "use client";
 
 import { Button } from "@dallateas/ui/components/button";
+import { cn } from "@dallateas/ui/lib/utils";
 import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
 
 import { CustomSelect } from "@/components/custom-select";
 
-interface PaginationProps {
+type PaginationProps = {
   page: number;
   totalPages: number;
   totalItems: number;
@@ -13,7 +14,19 @@ interface PaginationProps {
   pageSizeOptions?: number[];
   onPageChange: (page: number) => void;
   onPageSizeChange: (size: number) => void;
+};
+
+function visiblePages(page: number, totalPages: number): (number | "gap-start" | "gap-end")[] {
+  if (totalPages <= 7) return Array.from({ length: totalPages }, (_, index) => index + 1);
+
+  const left = Math.max(2, page - 1);
+  const right = Math.min(totalPages - 1, page + 1);
+  const middle = Array.from({ length: right - left + 1 }, (_, index) => left + index);
+
+  return [1, ...(left > 2 ? ["gap-start" as const] : []), ...middle, ...(right < totalPages - 1 ? ["gap-end" as const] : []), totalPages];
 }
+
+const STEP_BUTTON = "size-11 md:size-8";
 
 export function Pagination({
   page,
@@ -27,82 +40,67 @@ export function Pagination({
   const start = totalItems === 0 ? 0 : (page - 1) * pageSize + 1;
   const end = Math.min(page * pageSize, totalItems);
 
-  function getPages(): (number | "...")[] {
-    if (totalPages <= 7) return Array.from({ length: totalPages }, (_, i) => i + 1);
-    const pages: (number | "...")[] = [1];
-    const left = Math.max(2, page - 1);
-    const right = Math.min(totalPages - 1, page + 1);
-    if (left > 2) pages.push("...");
-    for (let i = left; i <= right; i++) pages.push(i);
-    if (right < totalPages - 1) pages.push("...");
-    pages.push(totalPages);
-    return pages;
-  }
-
   return (
-    <nav aria-label="Paginacion" className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-      {}
-      <div className="flex items-center gap-3 text-xs text-muted-foreground">
-        <span>
+    <nav aria-label="Paginación" className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex items-center gap-3 text-[13px] text-muted-foreground">
+        <span className="tabular">
           {start}-{end} de {totalItems}
         </span>
         <div className="flex items-center gap-1.5">
           <span>Mostrar</span>
           <CustomSelect
             value={String(pageSize)}
-            onChange={(v) => onPageSizeChange(Number(v))}
+            onChange={(value) => onPageSizeChange(Number(value))}
             options={pageSizeOptions.map((size) => ({ value: String(size), label: String(size) }))}
-            label="Items por pagina"
-            className="w-16"
+            label="Ítems por página"
+            className="w-20"
           />
         </div>
       </div>
 
-      {}
       {totalPages > 1 && (
         <div className="flex items-center gap-1">
           <Button
             type="button"
             variant="outline"
             size="icon-sm"
+            className={STEP_BUTTON}
             disabled={page <= 1}
             onClick={() => onPageChange(1)}
-            aria-label="Primera pagina"
-            title="Primera pagina"
+            aria-label="Primera página"
           >
-            <ChevronsLeft className="h-3.5 w-3.5" />
+            <ChevronsLeft aria-hidden="true" />
           </Button>
           <Button
             type="button"
             variant="outline"
             size="icon-sm"
+            className={STEP_BUTTON}
             disabled={page <= 1}
             onClick={() => onPageChange(page - 1)}
-            aria-label="Pagina anterior"
-            title="Anterior"
+            aria-label="Página anterior"
           >
-            <ChevronLeft className="h-3.5 w-3.5" />
+            <ChevronLeft aria-hidden="true" />
           </Button>
 
-          {getPages().map((p, i) =>
-            p === "..." ? (
-              <span key={`dots-${i}`} className="px-1 text-xs text-muted-foreground">
-                ...
+          {visiblePages(page, totalPages).map((entry) =>
+            typeof entry === "string" ? (
+              <span key={entry} aria-hidden="true" className="px-1 text-[13px] text-muted-foreground">
+                …
               </span>
             ) : (
               <button
-                key={p}
+                key={entry}
                 type="button"
-                onClick={() => onPageChange(p)}
-                aria-label={`Pagina ${p}`}
-                aria-current={page === p ? "page" : undefined}
-                className={`h-7 min-w-[1.75rem] rounded-md px-1.5 text-xs font-medium transition-colors ${
-                  page === p
-                    ? "bg-primary text-primary-foreground shadow-sm"
-                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                }`}
+                onClick={() => onPageChange(entry)}
+                aria-label={`Página ${entry}`}
+                aria-current={page === entry ? "page" : undefined}
+                className={cn(
+                  "tabular h-11 min-w-11 rounded-md px-1.5 text-[13px] font-medium transition-colors duration-[120ms] md:h-8 md:min-w-8",
+                  page === entry ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                )}
               >
-                {p}
+                {entry}
               </button>
             ),
           )}
@@ -111,23 +109,23 @@ export function Pagination({
             type="button"
             variant="outline"
             size="icon-sm"
+            className={STEP_BUTTON}
             disabled={page >= totalPages}
             onClick={() => onPageChange(page + 1)}
-            aria-label="Pagina siguiente"
-            title="Siguiente"
+            aria-label="Página siguiente"
           >
-            <ChevronRight className="h-3.5 w-3.5" />
+            <ChevronRight aria-hidden="true" />
           </Button>
           <Button
             type="button"
             variant="outline"
             size="icon-sm"
+            className={STEP_BUTTON}
             disabled={page >= totalPages}
             onClick={() => onPageChange(totalPages)}
-            aria-label="Ultima pagina"
-            title="Ultima pagina"
+            aria-label="Última página"
           >
-            <ChevronsRight className="h-3.5 w-3.5" />
+            <ChevronsRight aria-hidden="true" />
           </Button>
         </div>
       )}

@@ -1,0 +1,38 @@
+/* Only the packing list reaches paper. It sits deep in the app shell, so everything off its path is removed. */
+@media print {
+  @page {
+    margin: 14mm;
+  }
+
+  /* Paper is white even when the screen is dark and the dialog prints backgrounds. */
+  html:has(#set-bag),
+  body:has(#set-bag) {
+    background: #fff !important;
+  }
+
+  body:has(#set-bag) *:not(:has(#set-bag)):not(#set-bag):not(#set-bag *) {
+    display: none !important;
+  }
+
+  body:has(#set-bag) *:has(#set-bag) {
+    display: block !important;
+    width: auto !important;
+    min-height: 0 !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+  }
+
+  #set-bag {
+    border: 0 !important;
+    padding: 0 !important;
+  }
+
+  #set-bag,
+  #set-bag * {
+    color: #000 !important;
+    background: transparent !important;
+    border-color: #999 !important;
+  }
+}

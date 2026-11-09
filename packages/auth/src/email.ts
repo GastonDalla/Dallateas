@@ -12,32 +12,58 @@ const transporter =
       })
     : null;
 
+const INK = "#161615";
+const PAPER = "#FFFFFF";
+const FLUO = "#FF5B14";
+const MUTED = "#5E5E59";
+const SANS = "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
+
+/** Tables and inline styles, because that is all that survives Outlook and Gmail. */
 function baseTemplate(content: string) {
   return `<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
-<body style="margin:0;padding:0;background:#f5efe6;font-family:'Georgia',serif;">
-<div style="max-width:480px;margin:40px auto;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(44,24,16,0.08);">
-<div style="background:#2c1810;padding:24px 32px;text-align:center;">
-<h1 style="margin:0;color:#f5efe6;font-size:28px;letter-spacing:1px;">Dallateas</h1>
-</div>
-<div style="padding:32px;">${content}</div>
-<div style="padding:16px 32px;background:#faf7f2;text-align:center;border-top:1px solid #ede8df;">
-<p style="margin:0;color:#8a7a6b;font-size:12px;">Dallateas — Tu coleccion de vinilos</p>
-</div>
-</div>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>Dallateas</title>
+</head>
+<body style="margin:0;padding:0;background:${PAPER};color:${INK};font-family:${SANS};">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${PAPER};">
+<tr><td align="center" style="padding:32px 16px;">
+<table role="presentation" width="480" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:480px;">
+<tr><td style="background:${INK};color:${PAPER};padding:16px 24px;font-family:${SANS};font-size:18px;font-weight:700;">Dallateas</td></tr>
+<tr><td style="padding:32px 24px;font-family:${SANS};">${content}</td></tr>
+<tr><td style="padding:16px 24px;border-top:1px solid ${INK};color:${MUTED};font-family:${SANS};font-size:12px;">Dallateas, tu colección de vinilos</td></tr>
+</table>
+</td></tr>
+</table>
 </body>
 </html>`;
 }
 
-export async function sendEmail(to: string, subject: string, html: string) {
+function heading(text: string) {
+  return `<h1 style="margin:0 0 8px;color:${INK};font-size:24px;line-height:1.2;font-weight:700;">${text}</h1>`;
+}
+
+function paragraph(text: string) {
+  return `<p style="margin:0 0 24px;color:${INK};font-size:16px;line-height:1.5;">${text}</p>`;
+}
+
+function footnote(text: string) {
+  return `<p style="margin:24px 0 0;color:${MUTED};font-size:13px;line-height:1.5;">${text}</p>`;
+}
+
+/**
+ * Sends through Gmail when it is configured. Without it the email goes nowhere, so in development the
+ * code or link it carries is printed instead, letting a local sign-in finish. Never in production,
+ * where server logs are read by more people than the account owner.
+ */
+export async function sendEmail(to: string, subject: string, html: string, developmentPreview?: string) {
   if (!transporter) {
     console.log(`[EMAIL] To: ${to} | Subject: ${subject}`);
-    if (env.NODE_ENV === "development") {
-      const otpMatch = html.match(/class="otp"[^>]*>(\d+)</);
-      if (otpMatch) console.log(`[EMAIL] OTP: ${otpMatch[1]}`);
-      const urlMatch = html.match(/href="([^"]+)"[^>]*>.*[Ii]ngresar/);
-      if (urlMatch) console.log(`[EMAIL] Magic Link: ${urlMatch[1]}`);
+    if (env.NODE_ENV === "development" && developmentPreview) {
+      console.log(`[EMAIL] ${developmentPreview}`);
     }
     return;
   }
@@ -52,22 +78,20 @@ export async function sendEmail(to: string, subject: string, html: string) {
 
 export function otpEmailHtml(otp: string, type: string) {
   const titles: Record<string, string> = {
-    "sign-in": "Codigo de acceso",
-    "email-verification": "Verifica tu email",
-    "forget-password": "Recupera tu contrasena",
+    "sign-in": "Tu código de acceso",
+    "email-verification": "Verificá tu email",
+    "forget-password": "Recuperá tu contraseña",
   };
   const descriptions: Record<string, string> = {
-    "sign-in": "Usa este codigo para ingresar a tu cuenta.",
-    "email-verification": "Usa este codigo para verificar tu direccion de email.",
-    "forget-password": "Usa este codigo para restablecer tu contrasena.",
+    "sign-in": "Usá este código para ingresar a tu cuenta",
+    "email-verification": "Usá este código para verificar tu email",
+    "forget-password": "Usá este código para restablecer tu contraseña",
   };
   return baseTemplate(`
-    <h2 style="margin:0 0 8px;color:#2c1810;font-size:22px;">${titles[type] ?? "Codigo de verificacion"}</h2>
-    <p style="margin:0 0 24px;color:#6b5d4f;font-size:14px;line-height:1.5;">${descriptions[type] ?? "Usa este codigo:"}</p>
-    <div style="text-align:center;margin:24px 0;">
-      <span class="otp" style="display:inline-block;background:#2c1810;color:#f5efe6;font-size:32px;font-weight:bold;letter-spacing:8px;padding:16px 32px;border-radius:8px;">${otp}</span>
-    </div>
-    <p style="margin:24px 0 0;color:#8a7a6b;font-size:12px;text-align:center;">Este codigo expira en 10 minutos. Si no solicitaste esto, ignora este email.</p>
+    ${heading(titles[type] ?? "Tu código de verificación")}
+    ${paragraph(descriptions[type] ?? "Usá este código")}
+    <span class="otp" style="display:inline-block;background:${FLUO};color:${INK};font-size:32px;font-weight:700;letter-spacing:6px;padding:12px 20px;border-radius:2px;">${otp}</span>
+    ${footnote("Vence en 10 minutos. Si no lo pediste, ignorá este email")}
   `);
 }
 
@@ -81,11 +105,9 @@ function escapeHtml(str: string): string {
 export function magicLinkEmailHtml(url: string) {
   const safeUrl = escapeHtml(url);
   return baseTemplate(`
-    <h2 style="margin:0 0 8px;color:#2c1810;font-size:22px;">Ingresa a tu cuenta</h2>
-    <p style="margin:0 0 24px;color:#6b5d4f;font-size:14px;line-height:1.5;">Hace click en el boton para ingresar a Dallateas sin contrasena.</p>
-    <div style="text-align:center;margin:24px 0;">
-      <a href="${safeUrl}" style="display:inline-block;background:#2c1810;color:#f5efe6;font-size:16px;font-weight:bold;padding:14px 32px;border-radius:8px;text-decoration:none;">Ingresar a Dallateas</a>
-    </div>
-    <p style="margin:24px 0 0;color:#8a7a6b;font-size:12px;text-align:center;">Este link expira en 10 minutos. Si no solicitaste esto, ignora este email.</p>
+    ${heading("Ingresá a tu cuenta")}
+    ${paragraph("Tocá el botón para entrar a Dallateas sin contraseña")}
+    <a href="${safeUrl}" style="display:inline-block;background:${FLUO};color:${INK};font-size:16px;font-weight:700;padding:14px 24px;border-radius:4px;text-decoration:none;">Ingresar a Dallateas</a>
+    ${footnote("Este link vence en 5 minutos. Si no lo pediste, ignorá este email")}
   `);
 }

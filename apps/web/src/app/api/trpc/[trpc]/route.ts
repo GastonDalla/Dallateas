@@ -8,7 +8,8 @@ function handler(req: NextRequest) {
     endpoint: "/api/trpc",
     req,
     router: appRouter,
-    createContext: () => createContext(req),
+    maxBatchSize: 30,
+    createContext: ({ resHeaders }) => createContext({ headers: req.headers, resHeaders }),
   });
 }
 export { handler as GET, handler as POST };

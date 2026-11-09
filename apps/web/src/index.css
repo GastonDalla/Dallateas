@@ -22,10 +22,34 @@
   }
 }
 
+/* The dot-matrix figures of a mixer or CDJ screen. Live readouts only (tempo, pitch, time), at 28px or more. */
+@utility readout {
+  font-family: var(--font-doto), ui-monospace, monospace;
+  font-weight: 800;
+  font-variation-settings: "ROND" 100;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+}
+
+@utility tabular {
+  font-variant-numeric: tabular-nums;
+}
+
 @utility no-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;
   &::-webkit-scrollbar {
     display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

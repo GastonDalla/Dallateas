@@ -5,13 +5,13 @@ export default function manifest(): MetadataRoute.Manifest {
     name: "Dallateas",
     short_name: "Dallateas",
     description:
-      "Organiza tu coleccion de vinilos en bateas, arma tus sets y comparti tus carpetas.",
+      "BPM por track, tonalidad y pitch para mezclar en bandejas.",
     start_url: "/",
     display: "standalone",
     orientation: "portrait",
     categories: ["music", "entertainment", "lifestyle"],
-    background_color: "#f5efe6",
-    theme_color: "#2c1810",
+    background_color: "#121211",
+    theme_color: "#121211",
     icons: [
       {
         src: "/favicon/web-app-manifest-192x192.png",

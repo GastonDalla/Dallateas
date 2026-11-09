@@ -10,26 +10,25 @@
     }
   },
   "scripts": {
-    "db:local": "turso dev --db-file local.db",
     "db:push": "prisma db push",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "postinstall": "prisma generate",
-    "db:studio": "prisma studio"
+    "db:studio": "prisma studio",
+    "check-types": "tsc --noEmit"
   },
   "dependencies": {
-    "@prisma/adapter-libsql": "^7.2.0",
-    "@prisma/adapter-pg": "^7.5.0",
+    "@prisma/adapter-pg": "^7.10.1",
     "@prisma/client": "catalog:",
     "@dallateas/env": "workspace:*",
     "dotenv": "catalog:",
-    "pg": "^8.20.0",
+    "pg": "^8.23.1",
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@types/pg": "^8.18.0",
+    "@types/pg": "^8.23.1",
     "@dallateas/config": "workspace:*",
-    "prisma": "^7.2.0",
-    "typescript": "^5"
+    "prisma": "^7.10.1",
+    "typescript": "~6.0.3"
   }
 }

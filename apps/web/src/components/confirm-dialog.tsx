@@ -1,10 +1,71 @@
 "use client";
 
 import { Button } from "@dallateas/ui/components/button";
+import { cn } from "@dallateas/ui/lib/utils";
 import { Loader2 } from "lucide-react";
-import { useCallback, useEffect, useRef } from "react";
+import { useEffect, useId, useRef, type MouseEvent, type ReactNode, type SyntheticEvent } from "react";
 
 import { useHaptic } from "@/hooks/use-haptic";
+
+type ModalProps = {
+  onClose: () => void;
+  label?: string;
+  labelledBy?: string;
+  describedBy?: string;
+  role?: "dialog" | "alertdialog";
+  className?: string;
+  children: ReactNode;
+};
+
+/**
+ * The browser's modal dialog, which traps focus, closes on Escape and makes the page inert by itself.
+ * It opens above everything, toasts included, so whatever goes wrong inside it has to be said inside it.
+ */
+export function Modal({ onClose, label, labelledBy, describedBy, role, className, children }: ModalProps) {
+  const dialogRef = useRef<HTMLDialogElement>(null);
+
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+
+    const { style } = document.documentElement;
+    const previousOverflow = style.overflow;
+    style.overflow = "hidden";
+    dialog.showModal();
+
+    return () => {
+      dialog.close();
+      style.overflow = previousOverflow;
+    };
+  }, []);
+
+  function handleCancel(event: SyntheticEvent<HTMLDialogElement>) {
+    event.preventDefault();
+    onClose();
+  }
+
+  function handleBackdropClick(event: MouseEvent<HTMLDialogElement>) {
+    if (event.target === event.currentTarget) onClose();
+  }
+
+  return (
+    <dialog
+      ref={dialogRef}
+      role={role}
+      aria-label={label}
+      aria-labelledby={labelledBy}
+      aria-describedby={describedBy}
+      onCancel={handleCancel}
+      onClick={handleBackdropClick}
+      className={cn(
+        "m-auto max-h-[calc(100svh-2rem)] w-[calc(100vw-2rem)] max-w-sm overflow-y-auto rounded-xl bg-background p-0 text-foreground shadow-lg backdrop:bg-black/50",
+        className,
+      )}
+    >
+      {children}
+    </dialog>
+  );
+}
 
 type ConfirmDialogProps = {
   open: boolean;
@@ -16,98 +77,47 @@ type ConfirmDialogProps = {
   onCancel: () => void;
 };
 
-export function ConfirmDialog({
-  open,
+function ConfirmPanel({
   title,
   description,
   confirmLabel = "Eliminar",
   isLoading = false,
   onConfirm,
   onCancel,
-}: ConfirmDialogProps) {
+}: Omit<ConfirmDialogProps, "open">) {
   const haptic = useHaptic();
-  const cancelRef = useRef<HTMLButtonElement>(null);
-  const dialogRef = useRef<HTMLDivElement>(null);
+  const titleId = useId();
+  const descriptionId = useId();
 
   useEffect(() => {
-    if (open) {
-      haptic.trigger("warning");
-      setTimeout(() => cancelRef.current?.focus(), 50);
-    }
-  }, [open, haptic]);
-
-  useEffect(() => {
-    if (!open) return;
-    function handleKey(e: KeyboardEvent) {
-      if (e.key === "Escape") onCancel();
-    }
-    document.addEventListener("keydown", handleKey);
-    return () => document.removeEventListener("keydown", handleKey);
-  }, [open, onCancel]);
-
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
-      if (e.key !== "Tab" || !dialogRef.current) return;
-      const focusable = dialogRef.current.querySelectorAll<HTMLElement>(
-        "button:not(:disabled), [href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex='-1'])",
-      );
-      if (focusable.length === 0) return;
-      const first = focusable[0]!;
-      const last = focusable[focusable.length - 1]!;
-      if (e.shiftKey && document.activeElement === first) {
-        e.preventDefault();
-        last.focus();
-      } else if (!e.shiftKey && document.activeElement === last) {
-        e.preventDefault();
-        first.focus();
-      }
-    },
-    [],
-  );
-
-  if (!open) return null;
+    haptic.trigger("warning");
+  }, [haptic]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onCancel} aria-hidden="true" />
-      <div
-        ref={dialogRef}
-        role="alertdialog"
-        aria-modal="true"
-        aria-labelledby="confirm-dialog-title"
-        aria-describedby="confirm-dialog-desc"
-        onKeyDown={handleKeyDown}
-        className="relative w-full max-w-sm space-y-4 rounded-lg border border-border/60 bg-background p-6 shadow-xl animate-in fade-in zoom-in-95 duration-200"
-      >
-        <div className="space-y-1.5">
-          <h3 id="confirm-dialog-title" className="font-heading text-lg font-semibold">{title}</h3>
-          <p id="confirm-dialog-desc" className="text-sm text-muted-foreground">{description}</p>
+    <Modal role="alertdialog" labelledBy={titleId} describedBy={descriptionId} onClose={onCancel}>
+      <div className="flex flex-col gap-4 p-6">
+        <div className="flex flex-col gap-1.5">
+          <h2 id={titleId} className="font-heading text-xl font-semibold">
+            {title}
+          </h2>
+          <p id={descriptionId} className="text-sm text-pretty text-muted-foreground">
+            {description}
+          </p>
         </div>
         <div className="flex justify-end gap-2">
-          <Button
-            ref={cancelRef}
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={onCancel}
-            disabled={isLoading}
-          >
+          <Button type="button" variant="outline" className="h-11 px-3 text-[13px] md:h-8" onClick={onCancel} disabled={isLoading}>
             Cancelar
           </Button>
-          <Button
-            type="button"
-            variant="destructive"
-            size="sm"
-            onClick={onConfirm}
-            disabled={isLoading}
-          >
-            {isLoading ? (
-              <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" aria-hidden="true" />
-            ) : null}
+          <Button type="button" variant="destructive" className="h-11 px-3 text-[13px] md:h-8" onClick={onConfirm} disabled={isLoading}>
+            {isLoading && <Loader2 aria-hidden="true" className="size-3.5 animate-spin" />}
             {confirmLabel}
           </Button>
         </div>
       </div>
-    </div>
+    </Modal>
   );
+}
+
+export function ConfirmDialog({ open, ...panel }: ConfirmDialogProps) {
+  return open ? <ConfirmPanel {...panel} /> : null;
 }

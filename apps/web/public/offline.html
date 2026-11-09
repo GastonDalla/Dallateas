@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="es-AR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#121211">
+  <title>Sin conexión | Dallateas</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html { background: #121211; }
+    body {
+      min-height: 100svh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 24px;
+      max-width: 75rem;
+      margin: 0 auto;
+      padding: 64px 16px;
+      background: #121211;
+      color: #f2f1ed;
+      font: 400 16px/1.5 "Barlow", system-ui, -apple-system, "Segoe UI", sans-serif;
+    }
+    h1 {
+      font: 700 clamp(2.5rem, 12vw, 5.75rem)/0.92 "Barlow Condensed", "Arial Narrow", system-ui, sans-serif;
+      letter-spacing: -0.01em;
+      text-transform: uppercase;
+      text-wrap: balance;
+    }
+    p { max-width: 42ch; color: #a3a29b; text-wrap: pretty; }
+    button {
+      align-self: flex-start;
+      min-height: 44px;
+      padding: 0 16px;
+      border: 0;
+      border-radius: 4px;
+      background: #ff6a1f;
+      color: #121211;
+      font: 600 14px/1 "Barlow", system-ui, -apple-system, "Segoe UI", sans-serif;
+      cursor: pointer;
+      transition: background-color 120ms cubic-bezier(0.2, 0, 0, 1);
+    }
+    button:hover { background: #ff9463; }
+    button:focus-visible { outline: 2px solid #ff9463; outline-offset: 2px; }
+    @media (min-width: 768px) { body { padding-inline: 32px; } }
+    @media (prefers-reduced-motion: reduce) { button { transition: none; } }
+  </style>
+</head>
+<body>
+  <h1>Sin conexión</h1>
+  <p>Esta página necesita internet. Cuando vuelva la señal, tu colección sigue donde la dejaste.</p>
+  <button type="button" onclick="window.location.reload()">Reintentar</button>
+</body>
+</html>

@@ -1,53 +1,48 @@
-import { env } from "@dallateas/env/server";
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 
-const DISCOGS_BASE_URL = "https://api.discogs.com";
+import { discogsFetch, guardDiscogsRequest } from "@/lib/discogs-server";
+
+type DiscogsRelease = {
+  identifiers?: { type: string; value: string }[];
+  tracklist?: { type_: string; position?: string; title?: string; duration?: string }[];
+  videos?: { embed: boolean; title?: string; uri?: string; duration?: number }[];
+  uri?: string;
+};
 
 export async function GET(req: NextRequest) {
-  const { searchParams } = new URL(req.url);
-  const releaseId = searchParams.get("id");
+  // Public batea pages load videos from here, so visitors without an account are allowed, with a lower limit.
+  const blocked = await guardDiscogsRequest(req, { requireSession: false });
+  if (blocked) return blocked;
+
+  const releaseId = req.nextUrl.searchParams.get("id");
 
   if (!releaseId || !/^\d+$/.test(releaseId)) {
-    return NextResponse.json({ error: "ID invalido" }, { status: 400 });
+    return NextResponse.json({ error: "ID inválido" }, { status: 400 });
   }
 
-  const url = new URL(`${DISCOGS_BASE_URL}/releases/${releaseId}`);
-
-  if (env.DISCOGS_KEY && env.DISCOGS_SECRET) {
-    url.searchParams.set("key", env.DISCOGS_KEY);
-    url.searchParams.set("secret", env.DISCOGS_SECRET);
-  }
-
-  const res = await fetch(url.toString(), {
-    headers: {
-      "User-Agent": "Dallateas/1.0",
-      Accept: "application/json",
-    },
-  });
+  const res = await discogsFetch({ path: `/releases/${releaseId}`, revalidate: 86_400 });
 
   if (!res.ok) {
     return NextResponse.json({ tracklist: [], videos: [] }, { status: 200 });
   }
 
-  const data = await res.json();
-
-  // Extract barcode from identifiers
-  const barcode = data.identifiers?.find((i: any) => i.type === "Barcode")?.value ?? null;
+  const data = (await res.json()) as DiscogsRelease;
+  const barcode = data.identifiers?.find((identifier) => identifier.type === "Barcode")?.value ?? null;
 
   return NextResponse.json({
     tracklist: (data.tracklist ?? [])
-      .filter((t: any) => t.type_ === "track")
-      .map((t: any) => ({
-        position: t.position ?? "",
-        title: t.title ?? "",
-        duration: t.duration ?? "",
+      .filter((track) => track.type_ === "track")
+      .map((track) => ({
+        position: track.position ?? "",
+        title: track.title ?? "",
+        duration: track.duration ?? "",
       })),
     videos: (data.videos ?? [])
-      .filter((v: any) => v.embed)
-      .map((v: any) => ({
-        title: v.title ?? "",
-        uri: v.uri ?? "",
-        duration: v.duration ?? 0,
+      .filter((video) => video.embed)
+      .map((video) => ({
+        title: video.title ?? "",
+        uri: video.uri ?? "",
+        duration: video.duration ?? 0,
       })),
     barcode,
     discogsUrl: data.uri ?? null,

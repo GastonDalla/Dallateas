@@ -1,191 +1,127 @@
-"use client";
-
-import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Disc3, ListMusic, Lock } from "lucide-react";
+import { ArrowLeft, ListMusic } from "lucide-react";
+import type { Route } from "next";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
 
-import { Button } from "@dallateas/ui/components/button";
-import { Input } from "@dallateas/ui/components/input";
+import { Cover } from "@/components/dj/cover";
+import { RecordSticker } from "@/components/dj/track-tempo";
+import { CrateTab, StickeredCover } from "@/components/landing/crate-tile";
 import { QrDownload } from "@/components/qr-download";
-import { VinylCard } from "@/components/vinyl-card";
-import { trpc } from "@/utils/trpc";
+import { EmptyState } from "@/components/shell/empty-state";
+import { tempoRange } from "@/lib/format";
 
-export default function BateaDetail({ id }: { id: string }) {
-  const searchParams = useSearchParams();
-  const urlPassword = searchParams.get("pw") ?? undefined;
-  const [password, setPassword] = useState("");
-  const [submittedPassword, setSubmittedPassword] = useState<string | undefined>(urlPassword);
+import type { VisibleCrate } from "./load-crate";
+import { UnlockForm } from "./unlock-form";
 
-  useEffect(() => {
-    if (urlPassword && typeof window !== "undefined") {
-      const url = new URL(window.location.href);
-      url.searchParams.delete("pw");
-      window.history.replaceState({}, "", url.toString());
-    }
-  }, [urlPassword]);
+type CrateRecord = VisibleCrate["vinyls"][number];
 
-  const folderQuery = useQuery(
-    trpc.publicFolderDetail.queryOptions({
-      id,
-      password: submittedPassword,
-    }),
+function recordHref(crateId: string, recordId: string) {
+  return `/batea/${crateId}/vinyl/${recordId}` as Route;
+}
+
+function recordStyles({ genre, style }: CrateRecord) {
+  return [genre, style?.split(",")[0]?.trim()].filter(Boolean).join(" · ");
+}
+
+function RecordGrid({ crateId, records }: { crateId: string; records: CrateRecord[] }) {
+  return (
+    <ul className="grid grid-cols-2 gap-x-3 gap-y-6 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+      {records.map((record, index) => (
+        <li key={record.id} className="min-w-0">
+          <Link href={recordHref(crateId, record.id)} className="group block">
+            <StickeredCover
+              record={record}
+              bpm={record.bpm}
+              priority={index < 4}
+              sizes="(min-width: 1280px) 20vw, (min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw"
+            />
+            <p className="mt-2 line-clamp-2 text-sm font-medium transition-colors duration-100 group-hover:text-link">{record.title}</p>
+            <p className="truncate text-sm text-muted-foreground">{record.artist}</p>
+            {recordStyles(record) && <p className="truncate text-[13px] text-muted-foreground">{recordStyles(record)}</p>}
+          </Link>
+        </li>
+      ))}
+    </ul>
   );
-  const folder = folderQuery.data;
+}
 
-  if (folderQuery.isLoading) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <Disc3 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
+function SetList({ crateId, records }: { crateId: string; records: CrateRecord[] }) {
+  return (
+    <>
+      <p className="mb-3 flex items-center gap-2 text-sm text-muted-foreground">
+        <ListMusic aria-hidden="true" className="size-4" />
+        Tracklist de {records.length} {records.length === 1 ? "disco" : "discos"}
+      </p>
+      <ol className="divide-y divide-border">
+        {records.map((record, index) => (
+          <li key={record.id}>
+            <Link
+              href={recordHref(crateId, record.id)}
+              className="group flex items-center gap-3 py-2.5 transition-colors duration-100 hover:bg-muted"
+            >
+              <span className="tabular w-6 shrink-0 text-right text-sm text-muted-foreground">{index + 1}</span>
+              <Cover src={record.coverUrl} alt="" sizes="48px" className="w-12 shrink-0" />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-medium group-hover:text-link">{record.title}</span>
+                <span className="block truncate text-sm text-muted-foreground">
+                  {record.artist}
+                  {record.label && ` · ${record.label}`}
+                </span>
+              </span>
+              <span className="tabular hidden shrink-0 text-[13px] text-muted-foreground sm:block">
+                {[recordStyles(record), record.year].filter(Boolean).join(" · ")}
+              </span>
+              <RecordSticker tracks={record.tracks} bpm={record.bpm} className="shrink-0" />
+            </Link>
+          </li>
+        ))}
+      </ol>
+    </>
+  );
+}
 
-  if (!folder) {
-    return (
-      <div className="flex flex-col items-center gap-4 py-20 text-center">
-        <p className="text-sm text-muted-foreground">Esta batea no existe o no es publica.</p>
-        <Link href="/bateas" className="text-sm text-primary underline">Ver todas las bateas</Link>
-      </div>
-    );
-  }
+export default function BateaDetail({ folder }: { folder: VisibleCrate }) {
+  const tempos = tempoRange(folder.vinyls.flatMap(({ tracks }) => tracks));
+  const details = [
+    `por ${folder.user.name}`,
+    folder.locked ? "Contenido protegido" : `${folder.vinyls.length} ${folder.vinyls.length === 1 ? "vinilo" : "vinilos"}`,
+    ...(tempos ? [`${tempos} BPM`] : []),
+  ];
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-6 pb-20">
+    <div className="mx-auto max-w-[75rem] px-4 py-6 md:px-8 md:py-10">
       <Link
         href="/bateas"
-        className="mb-5 inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+        className="inline-flex min-h-11 items-center gap-1.5 text-sm text-muted-foreground transition-colors duration-100 hover:text-foreground md:min-h-0"
       >
-        <ArrowLeft className="h-4 w-4" />
+        <ArrowLeft aria-hidden="true" className="size-4" />
         Explorar bateas
       </Link>
 
-      <header className="mb-6 space-y-3">
-        <div className="flex items-start justify-between gap-3">
-          <div className="space-y-2">
-            <div className="flex items-center gap-2.5">
-              {folder.color && (
-                <div className="h-4 w-4 rounded-full" style={{ backgroundColor: folder.color }} />
-              )}
-              <h1 className="font-heading text-2xl font-bold">{folder.name}</h1>
-              {folder.hasPassword && <Lock className="h-4 w-4 text-muted-foreground" />}
-            </div>
-            {folder.description && (
-              <p className="text-sm text-muted-foreground">{folder.description}</p>
-            )}
-            <p className="text-xs text-muted-foreground">
-              por {folder.user.name} · {folder.locked ? "contenido protegido" : `${folder.vinyls.length} vinilos`}
-            </p>
+      <header className="mt-3 flex flex-wrap items-end justify-between gap-x-6 gap-y-3 border-b-4 border-foreground">
+        <CrateTab color={folder.color} locked={folder.hasPassword} className="px-4 pt-2 pb-1.5">
+          <h1 className="truncate font-heading text-[28px] leading-tight font-bold md:text-[2.5rem]">{folder.name}</h1>
+        </CrateTab>
+        {!folder.locked && (
+          <div className="pb-2">
+            <QrDownload label={folder.name} />
           </div>
-          {!folder.locked && (
-            <QrDownload
-              url={typeof window !== "undefined" ? window.location.href : ""}
-              label={folder.name}
-            />
-          )}
-        </div>
+        )}
       </header>
 
-      {}
-      {folder.locked ? (
-        <div className="flex flex-col items-center gap-4 rounded-lg border border-dashed border-border/60 py-16 text-center">
-          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-muted">
-            <Lock className="h-8 w-8 text-muted-foreground" />
-          </div>
-          <div className="space-y-1">
-            <p className="text-sm font-medium">Esta batea tiene contrasena</p>
-            <p className="text-xs text-muted-foreground">Ingresa la contrasena para ver el contenido.</p>
-          </div>
-          <div className="flex w-full max-w-xs gap-2">
-            <Input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Contrasena"
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && password.trim()) {
-                  setSubmittedPassword(password.trim());
-                }
-              }}
-            />
-            <Button
-              type="button"
-              disabled={!password.trim()}
-              onClick={() => setSubmittedPassword(password.trim())}
-            >
-              Entrar
-            </Button>
-          </div>
-          {submittedPassword && (
-            <p className="text-xs text-red-500">Contrasena incorrecta</p>
-          )}
-        </div>
-      ) : folder.vinyls.length === 0 ? (
-        <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed border-border/60 py-16 text-center">
-          <Disc3 className="h-10 w-10 text-muted-foreground/30" />
-          <p className="text-sm text-muted-foreground">Esta batea todavia no tiene vinilos.</p>
-        </div>
-      ) : folder.type === "SET" ? (
-        <div className="space-y-0">
-          <div className="mb-3 flex items-center gap-2 text-xs text-muted-foreground">
-            <ListMusic className="h-4 w-4" />
-            <span>Tracklist · {folder.vinyls.length} tracks</span>
-          </div>
-          {folder.vinyls.map((vinyl: any, i: number) => (
-            <Link
-              key={vinyl.id}
-              href={`/batea/${id}/vinyl/${vinyl.id}` as any}
-              className="group flex items-center gap-3 border-b border-border/40 px-2 py-3 transition-colors last:border-b-0 hover:bg-muted/50"
-            >
-              <span className="w-6 shrink-0 text-right text-xs font-medium text-muted-foreground">
-                {i + 1}
-              </span>
-              <div className="h-10 w-10 shrink-0 overflow-hidden rounded bg-muted">
-                {vinyl.coverUrl ? (
-                  <img src={vinyl.coverUrl} alt={vinyl.title} loading="lazy" decoding="async" width={40} height={40} className="h-full w-full object-cover" />
-                ) : (
-                  <div className="flex h-full items-center justify-center">
-                    <Disc3 className="h-4 w-4 text-muted-foreground/30" />
-                  </div>
-                )}
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium group-hover:text-primary">{vinyl.title}</p>
-                <p className="truncate text-xs text-muted-foreground">
-                  {vinyl.artist}
-                  {vinyl.label && <span> · {vinyl.label}</span>}
-                </p>
-              </div>
-              <div className="hidden shrink-0 items-center gap-3 text-[11px] text-muted-foreground sm:flex">
-                {vinyl.genre && (
-                  <span className="rounded-full bg-primary/10 px-2 py-0.5 text-primary">{vinyl.genre}</span>
-                )}
-                {vinyl.style && (
-                  <span className="rounded-full bg-accent px-2 py-0.5 text-accent-foreground">{vinyl.style.split(",")[0]?.trim()}</span>
-                )}
-                {vinyl.bpm && <span>{vinyl.bpm} BPM</span>}
-                {vinyl.year && <span>{vinyl.year}</span>}
-              </div>
-            </Link>
-          ))}
-        </div>
-      ) : (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
-          {folder.vinyls.map((vinyl: any) => (
-            <VinylCard
-              key={vinyl.id}
-              id={vinyl.id}
-              title={vinyl.title}
-              artist={vinyl.artist}
-              genre={vinyl.genre}
-              style={vinyl.style}
-              coverUrl={vinyl.coverUrl}
-              href={`/batea/${id}/vinyl/${vinyl.id}`}
-            />
-          ))}
-        </div>
-      )}
+      <p className="tabular mt-4 text-sm text-muted-foreground">{details.join(" · ")}</p>
+      {folder.description && <p className="mt-2 max-w-prose text-base text-pretty">{folder.description}</p>}
+
+      <div className="mt-8">
+        {folder.locked ? (
+          <UnlockForm crateId={folder.id} />
+        ) : folder.vinyls.length === 0 ? (
+          <EmptyState title="Esta batea todavía no tiene vinilos" />
+        ) : folder.type === "SET" ? (
+          <SetList crateId={folder.id} records={folder.vinyls} />
+        ) : (
+          <RecordGrid crateId={folder.id} records={folder.vinyls} />
+        )}
+      </div>
     </div>
   );
 }

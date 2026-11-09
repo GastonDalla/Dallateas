@@ -1,10 +1,10 @@
-import { auth } from "@dallateas/auth";
-import { headers } from "next/headers";
-import { redirect } from "next/navigation";
-
-import ProfilePage from "./profile-page";
-
 import type { Metadata } from "next";
+import { Suspense } from "react";
+
+import { ProfileEditor } from "@/components/profile/profile-editor";
+import { ProfileEditorSkeleton } from "@/components/profile/profile-editor-skeleton";
+import { requireSession } from "@/server/session";
+import { HydrateClient, prefetch, serverTrpc } from "@/server/trpc";
 
 export const metadata: Metadata = {
   title: "Perfil DJ",
@@ -12,10 +12,14 @@ export const metadata: Metadata = {
 };
 
 export default async function Profile() {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  });
-  if (!session?.user) redirect("/login");
+  const { user } = await requireSession();
+  await prefetch(serverTrpc.djProfileGet.queryOptions());
 
-  return <ProfilePage />;
+  return (
+    <HydrateClient>
+      <Suspense fallback={<ProfileEditorSkeleton />}>
+        <ProfileEditor username={user.username ?? null} />
+      </Suspense>
+    </HydrateClient>
+  );
 }

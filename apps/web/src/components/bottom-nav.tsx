@@ -1,57 +1,50 @@
 "use client";
 
+import { cn } from "@dallateas/ui/lib/utils";
+import { Plus } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-import { LayoutDashboard, ListMusic, PlusCircle } from "lucide-react";
-
+import { APP_NAV, isActive } from "./shell/nav-items";
 import { useAddVinyl } from "./add-vinyl-context";
+
+const [collection, folders, tools] = APP_NAV;
+const PHONE_NAV = [collection!, folders!, tools!];
 
 export function BottomNav() {
   const pathname = usePathname();
   const { openDrawer } = useAddVinyl();
 
-  const isDashboard = pathname.startsWith("/dashboard");
-  const isFolders = pathname.startsWith("/folders");
-
-  if (!isDashboard && !isFolders) return null;
-
   return (
-    <nav aria-label="Navegacion principal" className="fixed inset-x-0 bottom-0 z-30 bg-background md:static">
-      <div className="border-t border-border/60">
-        <div className="mx-auto flex max-w-md items-center justify-around px-4 py-1.5">
+    <nav
+      aria-label="Principal"
+      className="fixed inset-x-0 bottom-0 z-30 flex items-center justify-around border-t border-border bg-background px-2 pt-1.5 pb-[max(0.375rem,env(safe-area-inset-bottom))] md:hidden"
+    >
+      {PHONE_NAV.map(({ href, label, icon: Icon }) => {
+        const active = isActive(pathname, href);
+        return (
           <Link
-            href="/dashboard"
-            aria-current={isDashboard ? "page" : undefined}
-            className={`flex flex-col items-center gap-0.5 text-xs transition-colors ${
-              isDashboard ? "text-primary" : "text-muted-foreground"
-            }`}
+            key={href}
+            href={href}
+            aria-current={active ? "page" : undefined}
+            className={cn(
+              "flex min-w-16 flex-col items-center gap-0.5 py-1 text-xs transition-colors",
+              active ? "font-medium text-link" : "text-muted-foreground",
+            )}
           >
-            <LayoutDashboard className="h-5 w-5" aria-hidden="true" />
-            <span>Coleccion</span>
+            <Icon aria-hidden="true" className="size-5" />
+            {label}
           </Link>
-
-          <button
-            type="button"
-            onClick={() => openDrawer()}
-            aria-label="Agregar vinilo"
-            className="flex h-12 w-12 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-transform active:scale-95"
-          >
-            <PlusCircle className="h-5 w-5" aria-hidden="true" />
-          </button>
-
-          <Link
-            href="/folders"
-            aria-current={isFolders ? "page" : undefined}
-            className={`flex flex-col items-center gap-0.5 text-xs transition-colors ${
-              isFolders ? "text-primary" : "text-muted-foreground"
-            }`}
-          >
-            <ListMusic className="h-5 w-5" aria-hidden="true" />
-            <span>Carpetas</span>
-          </Link>
-        </div>
-      </div>
+        );
+      })}
+      <button
+        type="button"
+        onClick={() => openDrawer()}
+        aria-label="Agregar vinilo"
+        className="flex size-11 items-center justify-center rounded-md bg-primary text-primary-foreground transition-transform active:scale-95"
+      >
+        <Plus aria-hidden="true" className="size-5" />
+      </button>
     </nav>
   );
 }

@@ -1,53 +1,38 @@
-"use client";
+const LEVELS = [
+  { label: "Muy débil", color: "bg-clash" },
+  { label: "Débil", color: "bg-clash" },
+  { label: "Aceptable", color: "bg-warn" },
+  { label: "Fuerte", color: "bg-good" },
+  { label: "Muy fuerte", color: "bg-good" },
+];
 
-import { useMemo } from "react";
-
-interface PasswordStrengthBarProps {
-  password: string;
-}
-
-function getStrength(password: string): { score: number; label: string; color: string } {
-  if (!password) return { score: 0, label: "", color: "" };
-
-  let score = 0;
-
-  if (password.length >= 8) score++;
-  if (password.length >= 12) score++;
-  if (/[a-z]/.test(password) && /[A-Z]/.test(password)) score++;
-  if (/\d/.test(password)) score++;
-  if (/[^a-zA-Z0-9]/.test(password)) score++;
-
-  const levels: { label: string; color: string }[] = [
-    { label: "Muy debil", color: "bg-red-500" },
-    { label: "Debil", color: "bg-orange-500" },
-    { label: "Aceptable", color: "bg-yellow-500" },
-    { label: "Fuerte", color: "bg-emerald-500" },
-    { label: "Muy fuerte", color: "bg-emerald-600" },
+function scorePassword(password: string) {
+  const checks = [
+    password.length >= 8,
+    password.length >= 12,
+    /[a-z]/.test(password) && /[A-Z]/.test(password),
+    /\d/.test(password),
+    /[^a-zA-Z0-9]/.test(password),
   ];
-
-  const index = Math.min(score, levels.length) - 1;
-  const level = levels[Math.max(0, index)] ?? levels[0]!;
-  return { score, label: level.label, color: level.color };
+  return checks.filter(Boolean).length;
 }
 
-export default function PasswordStrengthBar({ password }: PasswordStrengthBarProps) {
-  const { score, label, color } = useMemo(() => getStrength(password), [password]);
-
+export default function PasswordStrengthBar({ password }: { password: string }) {
   if (!password) return null;
+
+  const score = scorePassword(password);
+  const level = LEVELS[Math.max(score - 1, 0)]!;
 
   return (
     <div className="space-y-1.5">
-      <div className="flex gap-1">
-        {Array.from({ length: 5 }).map((_, i) => (
-          <div
-            key={i}
-            className={`h-1.5 flex-1 rounded-full transition-colors ${
-              i < score ? color : "bg-muted"
-            }`}
-          />
+      <div aria-hidden="true" className="flex gap-1">
+        {LEVELS.map(({ label }, index) => (
+          <span key={label} className={`h-1 flex-1 transition-colors ${index < score ? level.color : "bg-muted"}`} />
         ))}
       </div>
-      <p className="text-xs text-muted-foreground">{label}</p>
+      <p aria-live="polite" className="text-[13px] text-muted-foreground">
+        {level.label}
+      </p>
     </div>
   );
 }

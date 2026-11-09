@@ -1,7 +1,6 @@
-import { env } from "@dallateas/env/server";
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 
-const DISCOGS_BASE_URL = "https://api.discogs.com";
+import { discogsFetch, guardDiscogsRequest } from "@/lib/discogs-server";
 
 const ALLOWED_PARAMS = [
   "q",
@@ -19,50 +18,48 @@ const ALLOWED_PARAMS = [
   "release_title",
 ] as const;
 
+type DiscogsSearchResult = {
+  id: number;
+  title: string;
+  year?: string;
+  country?: string;
+  format?: string[];
+  label?: string[];
+  genre?: string[];
+  style?: string[];
+  catno?: string;
+  barcode?: string[];
+  cover_image?: string;
+  thumb?: string;
+};
+
 export async function GET(req: NextRequest) {
-  const { searchParams } = new URL(req.url);
+  const blocked = await guardDiscogsRequest(req, { requireSession: true });
+  if (blocked) return blocked;
 
-  const url = new URL(`${DISCOGS_BASE_URL}/database/search`);
-
-  let hasQuery = false;
+  const params: Record<string, string> = {};
   for (const param of ALLOWED_PARAMS) {
-    const value = searchParams.get(param);
-    if (value?.trim()) {
-      url.searchParams.set(param, value.trim());
-      hasQuery = true;
-    }
+    const value = req.nextUrl.searchParams.get(param)?.trim();
+    if (value) params[param] = value;
   }
 
-  if (!hasQuery) {
+  if (Object.keys(params).length === 0) {
     return NextResponse.json({ results: [] });
   }
 
-  if (!url.searchParams.has("type")) {
-    url.searchParams.set("type", "release");
-  }
-
-  url.searchParams.set("per_page", "15");
-
-  if (env.DISCOGS_KEY && env.DISCOGS_SECRET) {
-    url.searchParams.set("key", env.DISCOGS_KEY);
-    url.searchParams.set("secret", env.DISCOGS_SECRET);
-  }
-
-  const res = await fetch(url.toString(), {
-    headers: {
-      "User-Agent": "Dallateas/1.0",
-      Accept: "application/json",
-    },
+  const res = await discogsFetch({
+    path: "/database/search",
+    params: { type: "release", ...params, per_page: "15" },
   });
 
   if (!res.ok) {
     return NextResponse.json({ results: [] }, { status: 200 });
   }
 
-  const data = await res.json();
+  const data = (await res.json()) as { results?: DiscogsSearchResult[] };
 
   return NextResponse.json({
-    results: (data.results ?? []).map((item: any) => ({
+    results: (data.results ?? []).map((item) => ({
       id: item.id,
       title: item.title,
       year: item.year,

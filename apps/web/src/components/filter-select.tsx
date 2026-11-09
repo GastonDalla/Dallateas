@@ -1,8 +1,10 @@
 "use client";
 
-import { ChevronDown, Search, X } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import { cn } from "@dallateas/ui/lib/utils";
+import { Check, ChevronDown, Search, X } from "lucide-react";
+import { useRef, useState } from "react";
+
+import { useAnchoredPopover } from "@/hooks/use-anchored-popover";
 
 type FilterOption = {
   value: string;
@@ -10,261 +12,170 @@ type FilterOption = {
   count?: number;
 };
 
-type FilterSelectSingleProps = {
+type SharedProps = {
   label: string;
   options: FilterOption[];
-  value: string | undefined;
-  onChange: (value: string | undefined) => void;
   placeholder?: string;
   searchThreshold?: number;
+};
+
+type FilterSelectSingleProps = SharedProps & {
+  value: string | undefined;
+  onChange: (value: string | undefined) => void;
   multi?: false;
   values?: never;
   onChangeMulti?: never;
 };
 
-type FilterSelectMultiProps = {
-  label: string;
-  options: FilterOption[];
+type FilterSelectMultiProps = SharedProps & {
   multi: true;
   values: string[];
   onChangeMulti: (values: string[]) => void;
-  placeholder?: string;
-  searchThreshold?: number;
   value?: never;
   onChange?: never;
 };
 
 type FilterSelectProps = FilterSelectSingleProps | FilterSelectMultiProps;
 
+function triggerLabel(props: FilterSelectProps) {
+  const fallback = props.placeholder ?? props.label;
+  if (props.multi) return props.values.length > 0 ? `${fallback}: ${props.values.length}` : fallback;
+  return props.options.find((option) => option.value === props.value)?.label ?? fallback;
+}
+
 export function FilterSelect(props: FilterSelectProps) {
-  const {
-    label,
-    options,
-    placeholder,
-    searchThreshold = 6,
-  } = props;
-  const [open, setOpen] = useState(false);
+  const { label, options, searchThreshold = 6 } = props;
   const [search, setSearch] = useState("");
-  const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0 });
-  const triggerRef = useRef<HTMLButtonElement>(null);
-  const dropdownRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
+  const popover = useAnchoredPopover({
+    onOpen: () => searchRef.current?.focus(),
+    onClose: () => setSearch(""),
+  });
 
-  const isMulti = props.multi === true;
-  const value = isMulti ? undefined : props.value;
-  const values = isMulti ? props.values : [];
-
-  const selectedOption = useMemo(
-    () => (isMulti ? null : options.find((o) => o.value === value)),
-    [options, value, isMulti],
-  );
-
-  const filtered = useMemo(() => {
-    if (!search.trim()) return options;
-    const q = search.toLowerCase();
-    return options.filter((o) => o.label.toLowerCase().includes(q));
-  }, [options, search]);
-
+  const selected = props.multi ? props.values : props.value ? [props.value] : [];
+  const hasSelection = selected.length > 0;
   const showSearch = options.length > searchThreshold;
+  const query = search.trim().toLowerCase();
+  const filtered = query ? options.filter((option) => option.label.toLowerCase().includes(query)) : options;
+  const total = options.reduce((sum, option) => sum + (option.count ?? 0), 0);
 
-  useEffect(() => {
-    if (!open || !triggerRef.current) return;
-    const update = () => {
-      if (!triggerRef.current) return;
-      const rect = triggerRef.current.getBoundingClientRect();
-      setDropdownPos({ top: rect.bottom + 4, left: rect.left });
-    };
-    update();
-    window.addEventListener("scroll", update, true);
-    window.addEventListener("resize", update);
-    return () => {
-      window.removeEventListener("scroll", update, true);
-      window.removeEventListener("resize", update);
-    };
-  }, [open]);
+  function clear() {
+    if (props.multi) props.onChangeMulti([]);
+    else props.onChange(undefined);
+  }
 
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: MouseEvent) => {
-      const target = e.target as Node;
-      if (
-        triggerRef.current && !triggerRef.current.contains(target) &&
-        dropdownRef.current && !dropdownRef.current.contains(target)
-      ) {
-        setOpen(false);
-        setSearch("");
-      }
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [open]);
-
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        setOpen(false);
-        setSearch("");
-      }
-    };
-    document.addEventListener("keydown", handler);
-    return () => document.removeEventListener("keydown", handler);
-  }, [open]);
-
-  useEffect(() => {
-    if (open && showSearch) {
-      requestAnimationFrame(() => searchRef.current?.focus());
+  function choose(value: string) {
+    if (props.multi) {
+      const next = props.values.includes(value)
+        ? props.values.filter((current) => current !== value)
+        : [...props.values, value];
+      props.onChangeMulti(next);
+      return;
     }
-  }, [open, showSearch]);
-
-  const select = useCallback(
-    (val: string | undefined) => {
-      if (isMulti && props.onChangeMulti) {
-        if (!val) {
-          props.onChangeMulti([]);
-        } else {
-          const current = props.values ?? [];
-          props.onChangeMulti(
-            current.includes(val) ? current.filter((v) => v !== val) : [...current, val],
-          );
-        }
-        return;
-      }
-      if (!isMulti && props.onChange) {
-        props.onChange(val);
-      }
-      setOpen(false);
-      setSearch("");
-    },
-    [isMulti, props],
-  );
-
-  const hasSelection = isMulti ? values.length > 0 : !!value;
-  const triggerLabel = isMulti
-    ? values.length > 0
-      ? `${values.length} seleccionado${values.length > 1 ? "s" : ""}`
-      : placeholder ?? label
-    : selectedOption ? selectedOption.label : placeholder ?? label;
+    props.onChange(value);
+    popover.close();
+  }
 
   if (options.length === 0) return null;
 
-  const dropdown = open && typeof document !== "undefined"
-    ? createPortal(
+  return (
+    <div
+      className={cn(
+        "flex h-11 shrink-0 items-center rounded-md border text-[13px] transition-colors duration-[120ms] md:h-9",
+        hasSelection ? "border-transparent bg-accent text-accent-foreground" : "border-input bg-card text-muted-foreground",
+      )}
+    >
+      <button
+        {...popover.triggerProps}
+        type="button"
+        aria-haspopup="listbox"
+        aria-label={label}
+        className={cn(
+          "flex h-full items-center gap-1.5 rounded-md pl-3 font-medium transition-colors duration-[120ms] hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring",
+          hasSelection ? "pr-1 hover:text-accent-foreground" : "pr-2.5",
+        )}
+      >
+        <span className="max-w-32 truncate">{triggerLabel(props)}</span>
+        {!hasSelection && <ChevronDown aria-hidden="true" className="size-3.5 shrink-0" />}
+      </button>
+      {hasSelection && (
+        <button
+          type="button"
+          onClick={clear}
+          aria-label={`Limpiar filtro ${label}`}
+          className="flex h-full w-8 items-center justify-center rounded-md focus-visible:outline-2 focus-visible:outline-ring"
+        >
+          <X aria-hidden="true" className="size-3.5" />
+        </button>
+      )}
+
+      <div
+        {...popover.panelProps}
+        className="fixed inset-auto m-0 w-60 overflow-hidden rounded-xl border border-border bg-popover text-popover-foreground shadow-md"
+      >
+        {showSearch && (
+          <div className="flex items-center gap-2 border-b border-border px-3">
+            <Search aria-hidden="true" className="size-3.5 shrink-0 text-muted-foreground" />
+            <input
+              ref={searchRef}
+              type="text"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder={`Buscar ${label.toLowerCase()}`}
+              aria-label={`Buscar ${label.toLowerCase()}`}
+              className="h-11 w-full bg-transparent text-base placeholder:text-muted-foreground focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring md:h-9 md:text-[13px]"
+            />
+          </div>
+        )}
+
         <div
-          ref={dropdownRef}
-          className="fixed z-9999 w-56 overflow-hidden rounded-lg border border-border/60 bg-background shadow-lg animate-in fade-in-0 zoom-in-95"
-          style={{ top: dropdownPos.top, left: dropdownPos.left }}
           role="listbox"
           aria-label={label}
+          aria-multiselectable={props.multi}
+          className="max-h-56 overflow-y-auto overscroll-contain p-1"
         >
-          {showSearch && (
-            <div className="border-b border-border/40 p-2">
-              <div className="flex items-center gap-2 rounded-md bg-muted px-2.5 py-1.5">
-                <Search className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
-                <input
-                  ref={searchRef}
-                  type="text"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder={`Buscar ${label.toLowerCase()}...`}
-                  className="w-full bg-transparent text-xs outline-none placeholder:text-muted-foreground/60"
-                  aria-label={`Buscar ${label.toLowerCase()}`}
-                />
-              </div>
-            </div>
+          <FilterOptionButton active={!hasSelection} onClick={clear} label="Todos" count={total || undefined} />
+          {filtered.length === 0 ? (
+            <p className="px-2.5 py-3 text-[13px] text-muted-foreground">Sin resultados</p>
+          ) : (
+            filtered.map((option) => (
+              <FilterOptionButton
+                key={option.value}
+                active={selected.includes(option.value)}
+                onClick={() => choose(option.value)}
+                label={option.label}
+                count={option.count}
+              />
+            ))
           )}
-
-          <div className="max-h-52 overflow-y-auto overscroll-contain p-1">
-            <button
-              type="button"
-              onClick={() => select(undefined)}
-              role="option"
-              aria-selected={!hasSelection}
-              className={`flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-xs transition-colors ${
-                !hasSelection
-                  ? "bg-primary/10 font-medium text-primary"
-                  : "text-foreground hover:bg-muted"
-              }`}
-            >
-              <span className="flex-1">Todos</span>
-              <span className="text-[10px] text-muted-foreground">
-                {options.reduce((sum, o) => sum + (o.count ?? 0), 0) || ""}
-              </span>
-            </button>
-
-            {filtered.length === 0 ? (
-              <p className="px-2.5 py-3 text-center text-[11px] text-muted-foreground">
-                Sin resultados
-              </p>
-            ) : (
-              filtered.map((option) => (
-                <button
-                  key={option.value}
-                  type="button"
-                  onClick={() => select(option.value)}
-                  role="option"
-                  aria-selected={isMulti ? values.includes(option.value) : value === option.value}
-                  className={`flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-xs transition-colors ${
-                    (isMulti ? values.includes(option.value) : value === option.value)
-                      ? "bg-primary/10 font-medium text-primary"
-                      : "text-foreground hover:bg-muted"
-                  }`}
-                >
-                  {isMulti && (
-                    <div className={`flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded border ${values.includes(option.value) ? "border-primary bg-primary text-primary-foreground" : "border-border/60"}`}>
-                      {values.includes(option.value) && <span className="text-[8px]">✓</span>}
-                    </div>
-                  )}
-                  <span className="flex-1 truncate">{option.label}</span>
-                  {option.count != null && (
-                    <span className="shrink-0 text-[10px] text-muted-foreground">
-                      {option.count}
-                    </span>
-                  )}
-                </button>
-              ))
-            )}
-          </div>
-        </div>,
-        document.body,
-      )
-    : null;
-
-  return (
-    <div className="relative">
-      <button
-        ref={triggerRef}
-        type="button"
-        onClick={() => setOpen(!open)}
-        aria-haspopup="listbox"
-        aria-expanded={open}
-        aria-label={label}
-        className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-all ${
-          hasSelection
-            ? "border-primary/30 bg-primary/10 text-primary"
-            : "border-border/60 bg-card text-muted-foreground hover:border-border hover:text-foreground"
-        }`}
-      >
-        <span className="max-w-30 truncate">
-          {triggerLabel}
-        </span>
-        {hasSelection ? (
-          <X
-            className="h-3 w-3 shrink-0 opacity-60 hover:opacity-100"
-            onClick={(e) => {
-              e.stopPropagation();
-              select(undefined);
-            }}
-            aria-label={`Limpiar filtro ${label}`}
-          />
-        ) : (
-          <ChevronDown
-            className={`h-3 w-3 shrink-0 transition-transform ${open ? "rotate-180" : ""}`}
-            aria-hidden="true"
-          />
-        )}
-      </button>
-      {dropdown}
+        </div>
+      </div>
     </div>
+  );
+}
+
+type FilterOptionButtonProps = {
+  active: boolean;
+  onClick: () => void;
+  label: string;
+  count?: number;
+};
+
+function FilterOptionButton({ active, onClick, label, count }: FilterOptionButtonProps) {
+  return (
+    <button
+      type="button"
+      role="option"
+      aria-selected={active}
+      onClick={onClick}
+      className={cn(
+        "flex min-h-11 w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-[13px] transition-colors duration-[120ms] md:min-h-9",
+        active ? "bg-accent font-medium text-accent-foreground" : "hover:bg-muted",
+      )}
+    >
+      <span className="flex-1 truncate">{label}</span>
+      {count !== undefined && <span className="tabular shrink-0 text-muted-foreground">{count}</span>}
+      {active && <Check aria-hidden="true" className="size-3.5 shrink-0" />}
+    </button>
   );
 }

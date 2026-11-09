@@ -1,52 +1,59 @@
 import { initTRPC, TRPCError } from "@trpc/server";
+import superjson from "superjson";
+import { ZodError } from "zod";
 
 import type { Context } from "./context";
+import { consumeMemoryLimit } from "./rate-limit";
 
-export const t = initTRPC.context<Context>().create();
+const UNIQUE_VIOLATION = "P2002";
+
+export const t = initTRPC.context<Context>().create({
+  // Keeps dates as dates on both sides, including data prefetched on the server.
+  transformer: superjson,
+  errorFormatter({ shape, error }) {
+    if (error.code === "INTERNAL_SERVER_ERROR") {
+      // Prisma and driver messages describe the schema, so they stay in the server logs.
+      console.error(error);
+      return { ...shape, message: "Algo salió mal. Intentá de nuevo.", data: { ...shape.data, stack: undefined } };
+    }
+    if (error.cause instanceof ZodError) {
+      return { ...shape, message: error.cause.issues[0]?.message ?? "Datos inválidos" };
+    }
+    return shape;
+  },
+});
 
 export const router = t.router;
+export const mergeRouters = t.mergeRouters;
 
-const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
-const RATE_LIMIT_WINDOW = 60_000; 
-const RATE_LIMIT_MAX = 60; 
-
-const rateLimitMiddleware = t.middleware(({ ctx, next }) => {
-  const ip = ctx.ip ?? "unknown";
-  const now = Date.now();
-  const entry = rateLimitMap.get(ip);
-
-  if (entry && entry.resetAt > now) {
-    if (entry.count >= RATE_LIMIT_MAX) {
-      throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "Demasiadas solicitudes. Intenta de nuevo en un momento." });
-    }
-    entry.count++;
-  } else {
-    rateLimitMap.set(ip, { count: 1, resetAt: now + RATE_LIMIT_WINDOW });
+const baseProcedure = t.procedure.use(async ({ next }) => {
+  const result = await next();
+  if (!result.ok && (result.error.cause as { code?: string } | undefined)?.code === UNIQUE_VIOLATION) {
+    throw new TRPCError({ code: "CONFLICT", message: "Ese valor ya existe", cause: result.error.cause });
   }
+  return result;
+});
 
-  if (rateLimitMap.size > 10000) {
-    for (const [key, val] of rateLimitMap) {
-      if (val.resetAt <= now) rateLimitMap.delete(key);
-    }
+const throttled = baseProcedure.use(({ ctx, next }) => {
+  const key = ctx.session?.user.id ?? ctx.ip;
+  if (!consumeMemoryLimit(key, { limit: 120, windowMs: 60_000 })) {
+    throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "Demasiadas solicitudes. Intentá de nuevo en un momento." });
   }
-
   return next();
 });
 
-export const publicProcedure = t.procedure.use(rateLimitMiddleware);
+export const publicProcedure = throttled;
 
-export const protectedProcedure = t.procedure.use(({ ctx, next }) => {
+export const protectedProcedure = throttled.use(({ ctx, next }) => {
   if (!ctx.session) {
-    throw new TRPCError({
-      code: "UNAUTHORIZED",
-      message: "Authentication required",
-      cause: "No session",
-    });
+    throw new TRPCError({ code: "UNAUTHORIZED", message: "Necesitás iniciar sesión" });
   }
-  return next({
-    ctx: {
-      ...ctx,
-      session: ctx.session,
-    },
-  });
+  return next({ ctx: { ...ctx, session: ctx.session } });
+});
+
+export const adminProcedure = protectedProcedure.use(({ ctx, next }) => {
+  if (ctx.session.user.role !== "admin") {
+    throw new TRPCError({ code: "FORBIDDEN", message: "Solo administradores" });
+  }
+  return next();
 });

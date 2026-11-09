@@ -1,3 +1,5 @@
+/** Client for this app's Discogs routes. Runs in the browser, from handlers and client queries. */
+
 export type DiscogsSearchRelease = {
   id: number;
   title: string;
@@ -14,7 +16,7 @@ export type DiscogsSearchRelease = {
 };
 
 type DiscogsSearchResponse = {
-  results: DiscogsSearchRelease[];
+  results?: DiscogsSearchRelease[];
 };
 
 type SearchParams = {
@@ -51,35 +53,30 @@ export type DiscogsReleaseDetail = {
   discogsUrl: string | null;
 };
 
-export async function fetchReleaseDetail(
-  releaseId: number | string,
-): Promise<DiscogsReleaseDetail> {
-  if (typeof window === "undefined") return { tracklist: [], videos: [], barcode: null, discogsUrl: null };
-  const url = new URL("/api/discogs/release", window.location.origin);
-  url.searchParams.set("id", String(releaseId));
-  const res = await fetch(url.toString());
-  if (!res.ok) return { tracklist: [], videos: [], barcode: null, discogsUrl: null };
+const NO_DETAIL: DiscogsReleaseDetail = { tracklist: [], videos: [], barcode: null, discogsUrl: null };
+
+/** Videos and tracklists only add to a record, so a failure reads as a release with neither. */
+export async function fetchReleaseDetail(releaseId: number | string): Promise<DiscogsReleaseDetail> {
+  const res = await fetch(`/api/discogs/release?${new URLSearchParams({ id: String(releaseId) })}`);
+  if (!res.ok) return NO_DETAIL;
   return res.json();
 }
 
-export async function searchReleases(
-  params: string | SearchParams,
-): Promise<DiscogsSearchRelease[]> {
-  if (typeof window === "undefined") return [];
-
-  const url = new URL("/api/discogs/search", window.location.origin);
+/** Results of a search, or null when Discogs could not be reached, which is not the same as finding nothing. */
+export async function searchReleases(params: string | SearchParams): Promise<DiscogsSearchRelease[] | null> {
+  const query = new URLSearchParams();
 
   if (typeof params === "string") {
     if (!params.trim()) return [];
-    url.searchParams.set("q", params);
+    query.set("q", params);
   } else {
     for (const [key, value] of Object.entries(params)) {
-      if (value?.trim()) url.searchParams.set(key, value.trim());
+      if (value?.trim()) query.set(key, value.trim());
     }
   }
 
-  const res = await fetch(url.toString());
-  if (!res.ok) return [];
+  const res = await fetch(`/api/discogs/search?${query}`);
+  if (!res.ok) return null;
 
   const data = (await res.json()) as DiscogsSearchResponse;
   return data.results ?? [];

@@ -7,7 +7,6 @@
       "esnext"
     ],
     "allowJs": true,
-    "baseUrl": ".",
     "skipLibCheck": true,
     "strict": true,
     "noEmit": true,
@@ -31,7 +30,11 @@
       "@dallateas/ui/*": [
         "../../packages/ui/src/*"
       ]
-    }
+    },
+    "types": [
+      "node",
+      "bun"
+    ]
   },
   "include": [
     "./next-env.d.ts",
