@@ -9,10 +9,13 @@ const MIN_AGREEING = 2;
 const MIN_SHARE_OF_WINDOWS = 6;
 
 /**
- * Dance styles a record is mixed in on a steady four-to-the-floor or broken 4/4 beat,
- * where a reading far below the floor's tempo is a misread and not the record.
+ * Discogs styles of records mixed on a steady four-to-the-floor or broken 4/4 beat, where a reading
+ * far below the floor's tempo is a misread and not the record. Matched by whole name: "Acid Jazz"
+ * and punk "Hardcore" share a word with dance styles and are not dance records.
  */
-const DANCE_STYLES = ["techno", "house", "trance", "acid", "electro", "minimal", "makina", "hardcore", "hardstyle", "schranz", "gabber"];
+const DANCE_STYLES = new Set(["acid", "electro", "minimal", "makina", "hardstyle", "schranz", "gabber", "happy hardcore"]);
+/** Any named kind of house, techno or trance, such as "Hard Techno", "Electro House" or "Progressive Trance". */
+const DANCE_FAMILY = /\b(?:house|techno|trance)\b/i;
 /** Below this a dance record was heard at half its speed. */
 const HALF_SPEED_BELOW = 90;
 /**
@@ -77,7 +80,7 @@ export function voteTempo(samples: Float32Array, sampleRate: number): ClipTempo 
 }
 
 function isDanceRecord(styles: readonly string[]) {
-  return styles.some((style) => DANCE_STYLES.some((dance) => style.toLowerCase().includes(dance)));
+  return styles.some((style) => DANCE_STYLES.has(style.trim().toLowerCase()) || DANCE_FAMILY.test(style));
 }
 
 /**

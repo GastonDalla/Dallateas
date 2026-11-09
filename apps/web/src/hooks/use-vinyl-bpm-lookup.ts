@@ -2,7 +2,7 @@
 
 import { useMutation } from "@tanstack/react-query";
 
-import { measurePreview } from "@/lib/preview-tempo";
+import { measurePreviews } from "@/lib/preview-tempo";
 import { trpc } from "@/utils/trpc";
 
 export type VinylBpmLookup = {
@@ -23,17 +23,10 @@ export function useVinylBpmLookup() {
 
   return async function lookupVinyl(id: string, signal?: AbortSignal): Promise<VinylBpmLookup> {
     const { previews, styles, ...result } = await lookup.mutateAsync({ id });
-
-    let measured = 0;
-    for (const { trackId, url } of previews) {
-      if (signal?.aborted) break;
-      try {
-        const bpm = await measurePreview(url, styles, signal);
-        if (bpm !== null && (await save.mutateAsync({ id: trackId, bpm })).saved) measured += 1;
-      } catch {
-        // A preview that will not download or decode is one track without a tempo, not a failed lookup.
-      }
-    }
+    const measured = await measurePreviews(
+      { previews, styles },
+      { save: async (trackId, bpm) => (await save.mutateAsync({ id: trackId, bpm })).saved, signal },
+    );
 
     return { ...result, found: result.found + measured };
   };

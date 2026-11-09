@@ -65,6 +65,18 @@ describe("tempo of a dance record", () => {
     expect(danceTempo(70, [])).toBe(70);
   });
 
+  test("a style is matched by name, so a word inside another style does not make it a dance record", () => {
+    expect(danceTempo(85, ["Acid Jazz"])).toBe(85);
+    expect(danceTempo(85, ["Hardcore", "Punk"])).toBe(85);
+    expect(danceTempo(95, ["Electroclash"])).toBe(95);
+  });
+
+  test("named variants of house, techno and trance are dance records", () => {
+    expect(danceTempo(70, ["Hard Techno"])).toBe(140);
+    expect(danceTempo(64, ["Electro House"])).toBe(128);
+    expect(danceTempo(69, ["Progressive Trance"])).toBe(138);
+  });
+
   test("each window is corrected before the vote, so the windows that heard the beat win", () => {
     // Michael Newman, Subscan: the video read 105 in most windows and 140 in the rest.
     const readings = [140, 140, 105, 105, 140, 140, 105, 140, 105, 105, 105, 105, 105, 105, 105, 105, 140, 140, 105, 105];
