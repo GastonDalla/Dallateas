@@ -560,6 +560,61 @@ describe.skipIf(!hasDatabase)("per-track BPM", () => {
     expect(urls.filter((url) => url.includes("/artist/hood/track"))).toHaveLength(1);
   });
 
+  test("an artist catalog that failed part-way is fetched again for the next track", async () => {
+    const owner = await createUser();
+    const vinyl = await createVinyl(owner.id, [], { tracks: twoTracks });
+    let pageCalls = 0;
+    const answers: Record<string, unknown> = {
+      "api.deezer.com/search": { data: [] },
+      "api.reccobeats.com/v1/track/search": { content: [] },
+      "api.reccobeats.com/v1/artist/search": { content: [{ id: "hood", name: "Robert Hood" }] },
+      "api.reccobeats.com/v1/track/plus/audio-features": { tempo: 128 },
+    };
+    globalThis.fetch = mock(async (url: string | URL | Request) => {
+      const path = String(url);
+      if (path.includes("/artist/hood/track")) {
+        pageCalls += 1;
+        return pageCalls === 1
+          ? new Response("Service Unavailable", { status: 503 })
+          : Response.json({ content: [{ id: "plus", trackTitle: "Plus", artists: [{ name: "Robert Hood" }] }], totalPages: 1 });
+      }
+      const key = Object.keys(answers).find((fragment) => path.includes(fragment));
+      return key ? Response.json(answers[key]) : new Response("{}", { status: 404 });
+    }) as unknown as typeof fetch;
+
+    expect(await callerFor({ id: owner.id }).vinylLookupBpm({ id: vinyl.id })).toMatchObject({ searched: 2, found: 1 });
+    expect(pageCalls).toBe(2);
+    const { tracks } = await callerFor({ id: owner.id }).vinylGet({ id: vinyl.id });
+    expect(tracks.map((track) => track.bpm)).toEqual([null, 128]);
+  });
+
+  test("only the first two artists sharing the exact name are read", async () => {
+    const owner = await createUser();
+    const vinyl = await createVinyl(owner.id, [], { tracks: [twoTracks[0]] });
+    stubDeezer({
+      "api.deezer.com/search": { data: [] },
+      "api.reccobeats.com/v1/track/search": { content: [] },
+      "api.reccobeats.com/v1/artist/search": {
+        content: [
+          { id: "first", name: "Robert Hood" },
+          { id: "second", name: "Robert Hood" },
+          { id: "third", name: "Robert Hood" },
+        ],
+      },
+      "api.reccobeats.com/v1/artist/first/track": { content: [], totalPages: 1 },
+      "api.reccobeats.com/v1/artist/second/track": { content: [], totalPages: 1 },
+      "api.reccobeats.com/v1/artist/third/track": {
+        content: [{ id: "minus", trackTitle: "Minus", artists: [{ name: "Robert Hood" }] }],
+        totalPages: 1,
+      },
+      "api.reccobeats.com/v1/track/minus/audio-features": { tempo: 130 },
+    });
+
+    expect(await callerFor({ id: owner.id }).vinylLookupBpm({ id: vinyl.id })).toMatchObject({ found: 0 });
+    const urls = (globalThis.fetch as unknown as ReturnType<typeof mock>).mock.calls.map(([url]) => String(url));
+    expect(urls.some((url) => url.includes("/artist/third/track"))).toBe(false);
+  });
+
   test("a track on a later page of the artist's catalog is found", async () => {
     const owner = await createUser();
     const vinyl = await createVinyl(owner.id, [], { tracks: [twoTracks[0]] });

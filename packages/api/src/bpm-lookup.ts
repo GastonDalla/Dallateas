@@ -153,14 +153,20 @@ function pickTrack(tracks: ReccoTrack[], artist: string, title: string) {
   );
 }
 
+/** A catalog that missed a request is still searched, but not kept for the record's next tracks. */
+type ArtistCatalog = { tracks: ReccoTrack[]; complete: boolean };
+
 /** Every track ReccoBeats lists for artists with exactly this name, up to a few pages each. */
-async function artistCatalog(name: string, budget: AbortSignal): Promise<ReccoTrack[]> {
+async function artistCatalog(name: string, budget: AbortSignal): Promise<ArtistCatalog> {
   const artists = await recco<ReccoPage<{ id: string; name: string }>>(
     `/artist/search?searchText=${encodeURIComponent(name)}`,
     budget,
   );
-  const namesakes = (artists?.content ?? []).filter((entry) => normalizeName(entry.name) === name);
+  if (!artists) return { tracks: [], complete: false };
+
+  const namesakes = (artists.content ?? []).filter((entry) => normalizeName(entry.name) === name);
   const catalog: ReccoTrack[] = [];
+  let complete = true;
   for (const candidate of namesakes.slice(0, RECCOBEATS_MAX_ARTISTS)) {
     const page = (number: number) =>
       recco<ReccoPage<ReccoTrack>>(
@@ -171,16 +177,19 @@ async function artistCatalog(name: string, budget: AbortSignal): Promise<ReccoTr
     // The first page says how many there are; the rest are fetched together.
     const pages = Math.min(first?.totalPages ?? 0, RECCOBEATS_MAX_PAGES);
     const rest = await Promise.all(Array.from({ length: Math.max(pages - 1, 0) }, (_, index) => page(index + 1)));
-    for (const tracks of [first, ...rest]) catalog.push(...(tracks?.content ?? []));
+    for (const tracks of [first, ...rest]) {
+      if (tracks) catalog.push(...(tracks.content ?? []));
+      else complete = false;
+    }
   }
-  return catalog;
+  return { tracks: catalog, complete };
 }
 
 /**
  * Artist catalogs fetched during one record's lookup. Every track of a record shares the artist,
  * so the catalog is fetched once instead of once per track.
  */
-export type ArtistCatalogs = Map<string, Promise<ReccoTrack[]>>;
+export type ArtistCatalogs = Map<string, Promise<ArtistCatalog>>;
 
 /** Its search reads titles only, so a common title is looked for among the artist's own tracks. */
 async function reccoTrack(artist: string, title: string, catalogs: ArtistCatalogs, budget: AbortSignal) {
@@ -198,7 +207,10 @@ async function reccoTrack(artist: string, title: string, catalogs: ArtistCatalog
     catalog = artistCatalog(name, budget);
     catalogs.set(name, catalog);
   }
-  return pickTrack(await catalog, artist, title);
+  const { tracks, complete } = await catalog;
+  // Cut short by a failure or by a track's budget: the next track fetches it again.
+  if (!complete && catalogs.get(name) === catalog) catalogs.delete(name);
+  return pickTrack(tracks, artist, title);
 }
 
 /**
