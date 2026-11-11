@@ -59,3 +59,6 @@ packages/db/prisma/generated
 
 # Local agent state
 .atl/
+
+# ODD task logbooks (local only)
+odd/
